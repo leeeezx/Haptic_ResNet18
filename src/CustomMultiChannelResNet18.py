@@ -8,12 +8,17 @@ import numpy as np
 # 自定义多通道ResNet-18-1D模型
 class CustomMultiChannelResNet18(nn.Module):
     def __init__(self, num_channels, num_classes):
+        '''
+        Args:
+            num_channels (int): 输入数据的通道数。
+            num_classes (int): 分类任务的类别数
+        '''
         super(CustomMultiChannelResNet18, self).__init__()
         self.num_channels = num_channels
         self.num_classes = num_classes
 
-        # 输入层
-        self.conv1 = nn.Conv1d(in_channels=num_channels, out_channels=64, kernel_size=7, stride=2, padding=3)
+        # 输入层。一维卷积 -> 批归一化 -> ReLU激活 -> 最大池化
+        self.conv1 = nn.Conv1d(in_channels=num_channels, out_channels=64, kernel_size=7, stride=2, padding=3) 
         self.bn1 = nn.BatchNorm1d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
@@ -31,6 +36,15 @@ class CustomMultiChannelResNet18(nn.Module):
         self.fc = nn.Linear(512, num_classes)
 
     def make_resnet_layer(self, in_channels, out_channels, num_blocks, stride=1):
+        '''
+        构建一个 ResNet 层，包括卷积、批归一化和激活函数
+
+        Args:
+            in_channels (int): 输入通道数
+            out_channels (int): 输出通道数
+            num_blocks (int): 残差块数量
+            stride (int): 第一个残差块的步长，用于控制下采样
+        '''
         layers = []
         layers.append(nn.Conv1d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False))
         layers.append(nn.BatchNorm1d(out_channels))

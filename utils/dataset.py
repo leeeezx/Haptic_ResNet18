@@ -5,8 +5,7 @@
 '''
 import os
 import glob
-
-
+import pandas as pd
 
 def get_file_list(input_path: str) -> list:
     """
@@ -44,3 +43,39 @@ def get_file_list(input_path: str) -> list:
     else:
         print(f"错误：路径 {input_path} 不存在")
         return []
+
+
+def save_data(df: pd.DataFrame, input_file: str, output_dir: str = None, suffix: str = "_f") -> str:
+    """
+    保存处理后的数据
+    
+    Args:
+        df (pd.DataFrame): 处理后的数据
+        input_file (str): 输入文件路径
+        output_dir (str): 输出目录，如果为None则自动生成
+        suffix (str): 文件名后缀
+    
+    Returns:
+        str: 输出文件路径
+    """
+    try:
+        if output_dir is None:
+            raise ValueError("未指定输出目录,请提供output_dir参数")
+        
+        # 创建输出目录（如果不存在）
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 生成输出文件名
+        input_filename = os.path.splitext(os.path.basename(input_file))[0]
+        output_filename = f"{input_filename}{suffix}.csv"
+        output_file = os.path.join(output_dir, output_filename)
+        
+        # 保存文件
+        df.to_csv(output_file, index=False)
+        print(f"处理结果已保存至: {output_file}")
+        
+        return output_file
+        
+    except Exception as e:
+        print(f"保存文件时发生错误: {e}")
+        return None        

@@ -5,7 +5,9 @@
 from math import e
 import pandas as pd
 import os
-
+import sys
+sys.path.append(r"d:\CodeProject\haptic_ResNet")
+import utils.dataset
 
 def fill_by_interpret(file_path: str,):
     '''
@@ -88,55 +90,55 @@ def batch_fill(file_list: list[str], output_dir: str = None, suffix: str = "_f")
         df = fill_by_interpret(file_path)
 
         if df is not None:
-            output_file = save_data(df, file_path, output_dir=output_dir, suffix=suffix)
+            output_file = utils.dataset.save_data(df, file_path, output_dir=output_dir, suffix=suffix)
             if output_file:
                 successful_outputs.append(output_file)
         else:
             print(f"文件 {file_path} 处理失败，跳过")
 
 
-def save_data(df: pd.DataFrame, input_file: str, output_dir: str = None, suffix: str = "_f") -> str:
-    """
-    保存处理后的数据
+# 已将此函数转移至 utils/dataset.py
+# def save_data(df: pd.DataFrame, input_file: str, output_dir: str = None, suffix: str = "_f") -> str:
+#     """
+#     保存处理后的数据
     
-    Args:
-        df (pd.DataFrame): 处理后的数据
-        input_file (str): 输入文件路径
-        output_dir (str): 输出目录，如果为None则自动生成
-        suffix (str): 文件名后缀
+#     Args:
+#         df (pd.DataFrame): 处理后的数据
+#         input_file (str): 输入文件路径
+#         output_dir (str): 输出目录，如果为None则自动生成
+#         suffix (str): 文件名后缀
     
-    Returns:
-        str: 输出文件路径
-    """
-    try:
-        if output_dir is None:
-            raise ValueError("未指定输出目录,请提供output_dir参数")
+#     Returns:
+#         str: 输出文件路径
+#     """
+#     try:
+#         if output_dir is None:
+#             raise ValueError("未指定输出目录,请提供output_dir参数")
         
-        # 创建输出目录（如果不存在）
-        os.makedirs(output_dir, exist_ok=True)
+#         # 创建输出目录（如果不存在）
+#         os.makedirs(output_dir, exist_ok=True)
         
-        # 生成输出文件名
-        input_filename = os.path.splitext(os.path.basename(input_file))[0]
-        output_filename = f"{input_filename}{suffix}.csv"
-        output_file = os.path.join(output_dir, output_filename)
+#         # 生成输出文件名
+#         input_filename = os.path.splitext(os.path.basename(input_file))[0]
+#         output_filename = f"{input_filename}{suffix}.csv"
+#         output_file = os.path.join(output_dir, output_filename)
         
-        # 保存文件
-        df.to_csv(output_file, index=False)
-        print(f"处理结果已保存至: {output_file}")
+#         # 保存文件
+#         df.to_csv(output_file, index=False)
+#         print(f"处理结果已保存至: {output_file}")
         
-        return output_file
+#         return output_file
         
-    except Exception as e:
-        print(f"保存文件时发生错误: {e}")
-        return None            
+#     except Exception as e:
+#         print(f"保存文件时发生错误: {e}")
+#         return None            
     
 if __name__ == "__main__":
     # 测试单个文件
     # test_file = r"G:\\WorkFiles\\科研\\rokae_terrain_dataset\\01\\01-1-1-1\\01-1-1-1-05.csv"  # 替换为实际文件路径
     # batch_fill([test_file], output_dir=r"D:\Dataset")
-    import sys
-    sys.path.append(r"d:\CodeProject\haptic_ResNet")
+    
     # 测试批量文件处理
-    import utils.dataset
+    
     file_list = utils.dataset.get_file_list(r"G:\WorkFiles\科研\rokae_terrain_dataset\14\14-1-1-1")
     batch_fill(file_list, output_dir=r"D:\Dataset\14\14-1-1-1-f")

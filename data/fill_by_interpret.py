@@ -132,5 +132,11 @@ def save_data(df: pd.DataFrame, input_file: str, output_dir: str = None, suffix:
     
 if __name__ == "__main__":
     # 测试单个文件
-    test_file = r"G:\\WorkFiles\\科研\\rokae_terrain_dataset\\01\\01-1-1-1\\01-1-1-1-05.csv"  # 替换为实际文件路径
-    batch_fill([test_file], output_dir=r"D:\Dataset")
+    # test_file = r"G:\\WorkFiles\\科研\\rokae_terrain_dataset\\01\\01-1-1-1\\01-1-1-1-05.csv"  # 替换为实际文件路径
+    # batch_fill([test_file], output_dir=r"D:\Dataset")
+    import sys
+    sys.path.append(r"d:\CodeProject\haptic_ResNet")
+    # 测试批量文件处理
+    import utils.dataset
+    file_list = utils.dataset.get_file_list(r"G:\WorkFiles\科研\rokae_terrain_dataset\14\14-1-1-1")
+    batch_fill(file_list, output_dir=r"D:\Dataset\14\14-1-1-1-f")

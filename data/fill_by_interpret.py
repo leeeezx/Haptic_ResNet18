@@ -38,7 +38,7 @@ def fill_by_interpret(file_path: str,):
                 df[col] = pd.to_numeric(df[col], errors='coerce') # error='coerce' 将无法转换的值设为NaN
                 numeric_columns.append(col)
             except (ValueError, TypeError) as e:
-                print(f"列 '{col}' 保持原始类型, 由于: {e}")
+                print(f"\033[93m 列 '{col}' 保持原始类型, 由于: {e} \033[0m")
         
         # 5. 对数值列进行线性插值填充
         df_interpolated = df.copy()
@@ -47,10 +47,10 @@ def fill_by_interpret(file_path: str,):
             nan_count_before = df_interpolated[col].isna().sum()
             total_count = len(df_interpolated[col])
             if nan_count_before == 0:
-                print(f"列 '{col}': 未经过插值, 无NaN值")
+                print(f"\033[93m 列 '{col}': 未经过插值, 无NaN值 \033[0m")
             elif nan_count_before == total_count:
                 # 全为NaN的列，无法进行插值
-                print(f"警告: 列 '{col}' 全为NaN值，无法进行插值")
+                print(f"\033[93m 警告: 列 '{col}' 全为NaN值，无法进行插值 \033[0m")
             else:
                 # 部分为NaN的列，执行线性插值
                 df_interpolated[col] = df_interpolated[col].interpolate(method='linear')
@@ -63,10 +63,10 @@ def fill_by_interpret(file_path: str,):
         # 7. 检查是否还有NaN值
         remain_nans = df_filled.isna().sum().sum() # 两个sum得到总的NaN数量
         if remain_nans > 0:
-            print(f"警告: 仍有 {remain_nans} 个NaN值未能填充")
+            print(f"\033[93m 警告: 仍有 {remain_nans} 个NaN值未能填充 \033[0m")
             # 显示哪些列还有NaN
             nan_columns = df_filled.columns[df_filled.isna().any()].tolist()
-            print(f"包含NaN的列: {nan_columns}")
+            print(f"\033[93m 包含NaN的列: {nan_columns} \033[0m")
         else:
             print("所有NaN值已成功填充")
         
@@ -77,7 +77,7 @@ def fill_by_interpret(file_path: str,):
         return df_final
 
     except Exception as e:
-        print(f"fill_by_interpret函数运行发生错误: {e}")
+        print(f"\033[91m fill_by_interpret函数运行发生错误: {e} \033[0m")
 
 def batch_fill(file_list: list[str], output_dir: str = None, suffix: str = "_f"):
     '''
@@ -94,7 +94,7 @@ def batch_fill(file_list: list[str], output_dir: str = None, suffix: str = "_f")
             if output_file:
                 successful_outputs.append(output_file)
         else:
-            print(f"文件 {file_path} 处理失败，跳过")
+            print(f"\033[91m 文件 {file_path} 处理失败，跳过 \033[0m")
 
 
 # 已将此函数转移至 utils/dataset.py

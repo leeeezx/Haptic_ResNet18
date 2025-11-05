@@ -13,9 +13,9 @@ REQUIRED_COLUMNS = {
 }
 
 
-def load_signals(csv_path: Path) -> pd.DataFrame:
-	if not csv_path.exists():
-		raise FileNotFoundError(f"未找到CSV文件: {csv_path}")
+def load_signals(csv_path: str) -> pd.DataFrame:
+	# if not csv_path.exists():
+	# 	raise FileNotFoundError(f"未找到CSV文件: {csv_path}")
 
 	df = pd.read_csv(csv_path)
 	missing = REQUIRED_COLUMNS.difference(df.columns)
@@ -66,7 +66,7 @@ def plot_signals(df: pd.DataFrame) -> None:
 
 
 def main() -> None:
-	csv_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(r"D:\Dataset\01\01-1-1-1-f\01-1-1-1-04_f.csv")
+	csv_path = r"D:\Dataset\01\01-1-1-1-p2\01-1-1-1-03_f_p_p2.csv"
 	df = load_signals(csv_path)
 	plot_signals(df)
 	plt.show()

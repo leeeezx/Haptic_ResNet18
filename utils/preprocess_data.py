@@ -10,7 +10,8 @@ from sklearn.preprocessing import MinMaxScaler
 def preprocess_and_save_data(data_root="D:/Dataset/", 
                              save_dir="d:/CodeProject/haptic_ResNet/data"):
     """
-    从原始数据预处理并保存测试数据，供评估使用
+    从原始数据预处理并保存测试数据，文件形式为.pt，只供评估时读取使用。  
+    原理与train.py中的数据预处理类似，但这里直接保存为.pt文件，方便评估脚本读取。
     
     Args:
         data_root: 原始数据根目录

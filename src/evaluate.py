@@ -60,9 +60,9 @@ def evaluate_model(model_path, params_path, data_dir, results_dir):
     # 1. 混淆矩阵
     cm = confusion_matrix(y_test.numpy(), y_pred)
     
-    plt.figure(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(10, 8))  
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=TERRAINS)
-    disp.plot(cmap='Blues', values_format='d')
+    disp.plot(ax=ax, cmap='Blues', values_format='d') 
     plt.title('混淆矩阵')
     plt.xticks(rotation=45)
     plt.tight_layout()

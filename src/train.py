@@ -204,7 +204,7 @@ net = NeuralNetClassifier(
 
 # 使用Skorch的GridSearchCV执行超参数搜索
 print("开始超参数搜索...")
-grid_search = GridSearchCV(net, param_grid, cv=3, scoring='accuracy', n_jobs=1, verbose=3)
+grid_search = GridSearchCV(net, param_grid, cv=5, scoring='accuracy', n_jobs=1, verbose=3)
 grid_search.fit(Train_data_final_tensor, y=Train_data_final_label_tensor)
 
 # 输出最佳超参数组合和验证集上的性能
@@ -222,13 +222,13 @@ print(f"测试集准确率: {test_accuracy:.4f}")
 weights_dir = 'd:/CodeProject/haptic_ResNet/models/weights'
 os.makedirs(weights_dir, exist_ok=True)
 torch.save(best_model.module_.state_dict(), 
-           os.path.join(weights_dir, 'best_model_weights-100epochs.pth'))
+           os.path.join(weights_dir, 'best_model_weights-100epochs-cv5.pth'))
 
 # 保存Skorch模型的超参数
 hyperparams_dir = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
 os.makedirs(hyperparams_dir, exist_ok=True)
 joblib.dump(best_model, 
-            os.path.join(hyperparams_dir, 'best_model_params-100epochs.pkl'))
+            os.path.join(hyperparams_dir, 'best_model_params-100epochs-cv5.pkl'))
 
 print("模型训练和保存完成")
 

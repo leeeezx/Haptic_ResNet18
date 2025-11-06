@@ -273,6 +273,12 @@ def main():
     """
     all_data, all_labels, terrain_to_index, index_to_terrain, num_classes = load_data(DATA_ROOT)
     X_train, X_test, y_train, y_test, scalers = preprocess_data(all_data, all_labels)
+
+    # os.makedirs(SCALERS_DIR, exist_ok=True)
+    # scaler_path = os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')
+    # joblib.dump(scalers, scaler_path)
+    # print(f"Scalers已保存到: {scaler_path}")
+
     best_model = train_and_evaluate(X_train, y_train, X_test, y_test, num_classes)
     
     terrain_mapping = {

@@ -67,14 +67,14 @@ for terrain_name in TERRAINS:
             # 我们希望得到的数组形状是 (序列长度, 2)
             sample_data = df[['/realtime_robot_poseAndextTau/data.2', 
                               '/realtime_robot_poseAndextTau/data.8']].values 
-            
+        
             all_data.append(sample_data)
             all_labels.append(label_index)
 
 print(f"数据加载完成!共加载了 {len(all_data)} 个样本。")
 
 # 保存映射关系供后续使用
-with open('terrain_mapping.json', 'w') as f:
+with open(r"D:\CodeProject\haptic_ResNet\data\terrain_mapping.json", 'w') as f:
     json.dump({'terrain_to_index': terrain_to_index, 
                'index_to_terrain': index_to_terrain}, f, indent=2)
 

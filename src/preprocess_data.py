@@ -1,0 +1,166 @@
+import os
+import json
+import re
+import numpy as np
+import pandas as pd
+import torch
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+
+def preprocess_and_save_data(data_root="D:/Dataset/", 
+                             save_dir="d:/CodeProject/haptic_ResNet/data"):
+    """
+    从原始数据预处理并保存测试数据，供评估使用
+    
+    Args:
+        data_root: 原始数据根目录
+        save_dir: 预处理后数据保存目录
+    """
+    # 创建保存目录
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 1. 定义数据路径和类别
+    # ==========================================
+    all_folders = os.listdir(data_root)
+    TERRAINS = sorted([
+        folder for folder in all_folders 
+        if os.path.isdir(os.path.join(data_root, folder)) and re.match(r'^\d{2}$', folder)
+    ])
+    NUM_CLASSES = len(TERRAINS)
+    
+    print(f"发现 {NUM_CLASSES} 种地形: {TERRAINS}")
+    
+    # 2. 从CSV文件加载数据和标签
+    # ==========================================
+    all_data = []
+    all_labels = []
+    
+    # 创建地形名称到连续索引的映射
+    terrain_to_index = {terrain: idx for idx, terrain in enumerate(TERRAINS)}
+    index_to_terrain = {idx: terrain for terrain, idx in terrain_to_index.items()}
+    
+    print(f"地形映射关系: {terrain_to_index}")
+    
+    # 遍历每一种地形
+    for terrain_name in TERRAINS:
+        label_index = terrain_to_index[terrain_name]
+        
+        terrain_path = os.path.join(data_root, terrain_name)
+        subfolders = os.listdir(terrain_path)
+        # 过滤二级目录:只保留包含 '-p2' 后缀的文件夹
+        valid_subfolders = [
+            subfolder for subfolder in subfolders 
+            if os.path.isdir(os.path.join(terrain_path, subfolder)) and '-p2' in subfolder
+        ]
+        
+        print(f"地形 {terrain_name}: 发现 {len(valid_subfolders)} 个有效子文件夹")
+        
+        for subfolder in valid_subfolders:
+            subfolder_path = os.path.join(terrain_path, subfolder)
+            # 获取该地形文件夹下所有的csv文件
+            csv_files = [f for f in os.listdir(subfolder_path) if f.endswith('.csv')]
+    
+            # 遍历并读取每一个csv文件
+            for csv_file in csv_files:
+                csv_path = os.path.join(subfolder_path, csv_file)
+                try:
+                    # 读取CSV文件
+                    df = pd.read_csv(csv_path)
+                    # 根据列名 '/realtime_robot_poseAndextTau/data.2' 和 '/realtime_robot_poseAndextTau/data.8' 提取数据
+                    sample_data = df[['/realtime_robot_poseAndextTau/data.2', '/realtime_robot_poseAndextTau/data.8']].values
+                    all_data.append(sample_data)
+                    all_labels.append(label_index)
+                except Exception as e:
+                    print(f"读取文件 {csv_path} 时出错: {e}")
+    
+    print(f"数据加载完成!共加载了 {len(all_data)} 个样本。")
+    
+    # 保存映射关系供后续使用
+    with open(os.path.join(save_dir, 'terrain_mapping.json'), 'w') as f:
+        json.dump({'terrain_to_index': terrain_to_index, 
+                   'index_to_terrain': index_to_terrain}, f, indent=2)
+    
+    # 2.5. 对所有样本进行长度统一(Padding)
+    # ==========================================
+    # 计算所有样本中的最大序列长度
+    max_length = 0
+    for sample in all_data:
+        if len(sample) > max_length:
+            max_length = len(sample)
+    print(f"数据中最长的序列长度为: {max_length}")
+    
+    # 现在,对所有比 max_length 短的样本进行填充
+    padded_data = []
+    for sample in all_data:
+        # sample 的形状是 (序列长度, 2)
+        len_sample = len(sample)
+        if len_sample < max_length:
+            # 计算需要填充的长度
+            padding_size = max_length - len_sample
+            # 使用 numpy.pad 进行填充
+            padded_sample = np.pad(sample, ((0, padding_size), (0, 0)), 'constant', constant_values=0)
+        else:
+            padded_sample = sample
+        padded_data.append(padded_sample)
+    
+    print(f"Padding完成,所有样本长度已统一为: {max_length}")
+    
+    # 3. 将数据列表转换为一个大的Numpy数组
+    # ==========================================
+    X = np.array(padded_data)
+    y = np.array(all_labels)
+    
+    # 转置数组以匹配模型输入格式
+    X = X.transpose(0, 2, 1)
+    
+    print(f"原始数据形状 (X): {X.shape}")
+    print(f"标签数据形状 (y): {y.shape}")
+    
+    # 4. 划分训练集和测试集
+    # ==========================================
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, 
+        test_size=0.2,
+        random_state=42,
+        stratify=y
+    )
+    
+    print(f"训练集大小: {X_train.shape}, 测试集大小: {X_test.shape}")
+    
+    # 5. 数据归一化 (Min-Max Scaling)
+    # ==========================================
+    print("开始归一化处理...")
+    # 我们需要对每个通道分别进行归一化
+    for i in range(X_train.shape[1]):
+        scaler = MinMaxScaler()
+        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :])
+        X_test[:, i, :] = scaler.transform(X_test[:, i, :])
+    
+    print("归一化完成")
+    
+    # 6. 将Numpy数组转换为PyTorch张量
+    # ==========================================
+    Train_data_final_tensor = torch.tensor(X_train, dtype=torch.float32)
+    Train_data_final_label_tensor = torch.tensor(y_train, dtype=torch.long)
+    Test_data_final_tensor = torch.tensor(X_test, dtype=torch.float32)
+    Test_data_final_label_tensor = torch.tensor(y_test, dtype=torch.long)
+    
+    # 保存所有数据集
+    torch.save(Train_data_final_tensor, os.path.join(save_dir, 'X_train.pt'))
+    torch.save(Train_data_final_label_tensor, os.path.join(save_dir, 'y_train.pt'))
+    torch.save(Test_data_final_tensor, os.path.join(save_dir, 'X_test.pt'))
+    torch.save(Test_data_final_label_tensor, os.path.join(save_dir, 'y_test.pt'))
+    
+    # 保存最大序列长度，用于后续可能的新数据预处理
+    with open(os.path.join(save_dir, 'max_length.json'), 'w') as f:
+        json.dump({'max_length': max_length}, f)
+    
+    print(f"\n所有预处理数据已保存到: {save_dir}")
+    print("- 训练数据: X_train.pt, y_train.pt")
+    print("- 测试数据: X_test.pt, y_test.pt")
+    print("- 地形映射: terrain_mapping.json")
+    print("- 最大序列长度: max_length.json")
+
+if __name__ == "__main__":
+    # 执行预处理
+    preprocess_and_save_data()

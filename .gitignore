@@ -32,3 +32,6 @@ __pycache__/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 结果文件夹
+results/

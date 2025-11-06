@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 def preprocess_and_save_data(data_root="D:/Dataset/", 
                              save_dir="d:/CodeProject/haptic_ResNet/data",
-                             scalers_path: str = None,
+                             # scalers_path: str = None,  # 注释掉：改为内部生成scalers
                              mode: str = "both",
                              filter_type: str = "suffix",
                              filter_pattern: str = "-p2"):
@@ -21,7 +21,7 @@ def preprocess_and_save_data(data_root="D:/Dataset/",
     Args:
         data_root: 原始数据根目录
         save_dir: 预处理后数据保存目录
-        scalers_path: 已保存的scalers文件路径，用于数据归一化
+        # scalers_path: 已保存的scalers文件路径，用于数据归一化  # 注释掉
         mode: 数据生成模式，可选值: "train"(只训练), "test"(只测试), "both"(训练+测试)
         filter_type: 文件夹过滤类型，可选值: "prefix"(前缀匹配), "suffix"(后缀匹配), "contains"(包含匹配)
         filter_pattern: 过滤模式字符串，如 "t-" 或 "-p2"
@@ -159,9 +159,14 @@ def preprocess_and_save_data(data_root="D:/Dataset/",
         # 5. 数据归一化 (Min-Max Scaling)
         # ==========================================
         print("开始归一化处理...")
-        scalers = joblib.load(scalers_path)
+        # scalers = joblib.load(scalers_path)  # 注释掉：改为内部生成
+        # 生成scalers
+        scalers = []
         for i in range(X_test.shape[1]):
-            X_test[:, i, :] = scalers[i].transform(X_test[:, i, :])
+            scaler = MinMaxScaler()
+            scaler.fit(X_test[:, i, :])
+            scalers.append(scaler)
+            X_test[:, i, :] = scaler.transform(X_test[:, i, :])
         print("归一化完成")
         
         # 6. 将Numpy数组转换为PyTorch张量
@@ -185,9 +190,14 @@ def preprocess_and_save_data(data_root="D:/Dataset/",
         # 5. 数据归一化 (Min-Max Scaling)
         # ==========================================
         print("开始归一化处理...")
-        scalers = joblib.load(scalers_path)
+        # scalers = joblib.load(scalers_path)  # 注释掉：改为内部生成
+        # 生成scalers
+        scalers = []
         for i in range(X_train.shape[1]):
-            X_train[:, i, :] = scalers[i].transform(X_train[:, i, :])
+            scaler = MinMaxScaler()
+            scaler.fit(X_train[:, i, :])
+            scalers.append(scaler)
+            X_train[:, i, :] = scaler.transform(X_train[:, i, :])
         print("归一化完成")
         
         # 6. 将Numpy数组转换为PyTorch张量
@@ -216,10 +226,15 @@ def preprocess_and_save_data(data_root="D:/Dataset/",
         # 5. 数据归一化 (Min-Max Scaling)
         # ==========================================
         print("开始归一化处理...")
-        scalers = joblib.load(scalers_path)
+        # scalers = joblib.load(scalers_path)  # 注释掉：改为内部生成
+        # 生成scalers（基于训练集）
+        scalers = []
         for i in range(X_train.shape[1]):
-            X_train[:, i, :] = scalers[i].transform(X_train[:, i, :])
-            X_test[:, i, :] = scalers[i].transform(X_test[:, i, :])
+            scaler = MinMaxScaler()
+            scaler.fit(X_train[:, i, :])
+            scalers.append(scaler)
+            X_train[:, i, :] = scaler.transform(X_train[:, i, :])
+            X_test[:, i, :] = scaler.transform(X_test[:, i, :])
         print("归一化完成")
         
         # 6. 将Numpy数组转换为PyTorch张量
@@ -252,7 +267,7 @@ if __name__ == "__main__":
     
     # 1. 生成测试数据（t-开头的文件夹）
     preprocess_and_save_data(
-        scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",
+        # scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",  # 注释掉
         mode="test",
         filter_type="prefix",
         filter_pattern="t-"
@@ -260,7 +275,7 @@ if __name__ == "__main__":
     
     # 2. 生成训练数据（-p2后缀的文件夹）
     # preprocess_and_save_data(
-    #     scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",
+    #     # scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",  # 注释掉
     #     mode="train",
     #     filter_type="suffix",
     #     filter_pattern="-p2"
@@ -268,7 +283,7 @@ if __name__ == "__main__":
     
     # 3. 生成训练+测试数据（包含特定字符的文件夹）
     # preprocess_and_save_data(
-    #     scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",
+    #     # scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",  # 注释掉
     #     mode="both",
     #     filter_type="contains",
     #     filter_pattern="p2"

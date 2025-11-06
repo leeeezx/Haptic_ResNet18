@@ -17,6 +17,7 @@ from CustomMultiChannelResNet18 import CustomMultiChannelResNet18
 DATA_ROOT = "D:/Dataset/"
 WEIGHTS_DIR = 'd:/CodeProject/haptic_ResNet/models/weights'
 HYPERPARAMS_DIR = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
+SCALERS_DIR = 'd:/CodeProject/haptic_ResNet/models/scalers'
 MAPPING_FILE = 'terrain_mapping.json'
 
 def load_data(data_root):
@@ -104,6 +105,7 @@ def preprocess_data(all_data, all_labels):
         X_test (np.ndarray): 测试集数据
         y_train (np.ndarray): 训练集标签
         y_test (np.ndarray): 测试集标签
+        scalers (list of MinMaxScaler): 用于归一化的scaler列表
     """
     # 2.5. 对所有样本进行长度统一(Padding)
     # ==========================================
@@ -161,16 +163,16 @@ def preprocess_data(all_data, all_labels):
     # 重要原则：只能在训练集上 `fit`（学习缩放规则），然后用这个规则去 `transform`（应用规则）训练集和测试集
     # 这样可以防止测试集的信息泄露给训练过程
     print("开始归一化处理...")
+    scalers = []  
     # 我们需要对每个通道分别进行归一化
     for i in range(X_train.shape[1]):  # X_train.shape[1] 就是通道数，这里是 2
         scaler = MinMaxScaler()
-        # scaler学习训练集第i个通道的缩放规则
-        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :])
-        # scaler应用在测试集第i个通道上
-        X_test[:, i, :] = scaler.transform(X_test[:, i, :])
+        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :]) # scaler学习训练集第i个通道的缩放规则
+        X_test[:, i, :] = scaler.transform(X_test[:, i, :]) # scaler应用在测试集第i个通道上
+        scalers.append(scaler)
     print("归一化完成")
     
-    return X_train, X_test, y_train, y_test
+    return X_train, X_test, y_train, y_test, scalers
 
 def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes):
     """
@@ -242,7 +244,7 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes):
 
     return best_model
 
-def save_artifacts(model, terrain_mapping):
+def save_artifacts(model, terrain_mapping, scalers):
     """
     保存训练好的模型、参数和地形映射关系。
     """
@@ -261,19 +263,23 @@ def save_artifacts(model, terrain_mapping):
     joblib.dump(model, 
                 os.path.join(HYPERPARAMS_DIR, 'best_model_params-100epochs.pkl'))
 
+    joblib.dump(scalers, 
+                os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl'))
+    # print(f"Scalers已保存到: {os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')}")
+
 def main():
     """
     主函数，按顺序执行数据加载、预处理、训练和保存。
     """
     all_data, all_labels, terrain_to_index, index_to_terrain, num_classes = load_data(DATA_ROOT)
-    X_train, X_test, y_train, y_test = preprocess_data(all_data, all_labels)
+    X_train, X_test, y_train, y_test, scalers = preprocess_data(all_data, all_labels)
     best_model = train_and_evaluate(X_train, y_train, X_test, y_test, num_classes)
     
     terrain_mapping = {
         'terrain_to_index': terrain_to_index,
         'index_to_terrain': index_to_terrain
     }
-    save_artifacts(best_model, terrain_mapping)
+    save_artifacts(best_model, terrain_mapping, scalers)
 
 if __name__ == "__main__":
     main()

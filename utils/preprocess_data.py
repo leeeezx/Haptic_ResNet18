@@ -4,11 +4,13 @@ import re
 import numpy as np
 import pandas as pd
 import torch
+import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
 def preprocess_and_save_data(data_root="D:/Dataset/", 
-                             save_dir="d:/CodeProject/haptic_ResNet/data"):
+                             save_dir="d:/CodeProject/haptic_ResNet/data",
+                             scalers_path: str = None):
     """
     从原始数据预处理并保存测试数据，文件形式为.pt，只供评估时读取使用。  
     原理与train.py中的数据预处理类似，但这里直接保存为.pt文件，方便评估脚本读取。
@@ -16,6 +18,7 @@ def preprocess_and_save_data(data_root="D:/Dataset/",
     Args:
         data_root: 原始数据根目录
         save_dir: 预处理后数据保存目录
+        scalers_path: 已保存的scalers文件路径，用于数据归一化
     """
     # 创建保存目录
     os.makedirs(save_dir, exist_ok=True)
@@ -132,11 +135,12 @@ def preprocess_and_save_data(data_root="D:/Dataset/",
     # ==========================================
     print("开始归一化处理...")
     # 我们需要对每个通道分别进行归一化
+    scalers = joblib.load(scalers_path)
     for i in range(X_train.shape[1]):
-        scaler = MinMaxScaler()
-        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :])
-        X_test[:, i, :] = scaler.transform(X_test[:, i, :])
-    
+        # scaler = MinMaxScaler()
+        X_train[:, i, :] = scalers[i].transform(X_train[:, i, :])
+        X_test[:, i, :] = scalers[i].transform(X_test[:, i, :])
+
     print("归一化完成")
     
     # 6. 将Numpy数组转换为PyTorch张量
@@ -164,4 +168,6 @@ def preprocess_and_save_data(data_root="D:/Dataset/",
 
 if __name__ == "__main__":
     # 执行预处理
-    preprocess_and_save_data()
+    preprocess_and_save_data(
+        scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl"
+    )

@@ -2,9 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
-import sys
-sys.path.append(r"d:\CodeProject\haptic_ResNet")
-import utils.dataset
+import dataset
 import os
 
 def find_offset_index(input_dir: str, left_offset: float, right_offset: float) -> tuple:
@@ -28,7 +26,7 @@ def find_offset_index(input_dir: str, left_offset: float, right_offset: float) -
     '''
     try:
         # 获取目录中所有CSV文件
-        file_list = utils.dataset.get_file_list(input_dir)
+        file_list = dataset.get_file_list(input_dir)
         if not file_list:
             raise ValueError(f"在目录 {input_dir} 中未找到CSV文件")
         
@@ -313,7 +311,7 @@ def batch_part_time(file_list: list[str], left_offset: float, right_offset: floa
         df = part_signal_time(file_path, left_offset, right_offset)
         
         if df is not None:
-            output_file = utils.dataset.save_data(df, file_path, output_dir=output_dir, suffix=suffix)
+            output_file = dataset.save_data(df, file_path, output_dir=output_dir, suffix=suffix)
             if output_file:
                 successful_outputs.append(output_file)
         else:
@@ -390,7 +388,7 @@ def batch_part_num(file_list: list[str], left_offset: int, right_offset: int, ou
                 print(f"  截断到目标长度: {target_length}")
             
             # 保存处理后的文件
-            output_file = utils.dataset.save_data(df, file_path, output_dir=output_dir, suffix=suffix)
+            output_file = dataset.save_data(df, file_path, output_dir=output_dir, suffix=suffix)
             if output_file:
                 successful_outputs.append(output_file)
         else:
@@ -403,7 +401,7 @@ def batch_part_num(file_list: list[str], left_offset: int, right_offset: int, ou
 
 if __name__ == "__main__":
 # ================================== 批量分割周期信号 ========================================
-    # file_list = utils.dataset.get_file_list(r"D:\Dataset\14\14-1-1-1-f")
+    # file_list = dataset.get_file_list(r"D:\Dataset\14\14-1-1-1-f")
     # batch_part(file_list, 
     #            left_offset=1.5, right_offset=6.8, 
     #            output_dir=r"D:\Dataset\14\14-1-1-1-p", 
@@ -413,7 +411,7 @@ if __name__ == "__main__":
     # find_offset_index(r"D:\Dataset\14\14-1-1-1-p", left_offset=1.5, right_offset=6.8)
 
 # ================================== 批量分割周期信号 ========================================
-    file_list = utils.dataset.get_file_list(r"D:\Dataset\14\14-1-1-1-p")
+    file_list = dataset.get_file_list(r"D:\Dataset\14\14-1-1-1-p")
     batch_part_num(file_list, 
                left_offset=1531, right_offset=6911, 
                output_dir=r"D:\Dataset\14\14-1-1-1-p2", 

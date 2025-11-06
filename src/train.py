@@ -182,7 +182,7 @@ else:
 # 定义超参数网格
 param_grid = {
     'lr': [0.1, 0.01, 0.001],
-    'batch_size': [32],
+    'batch_size': [16, 32],
     'max_epochs': [100],
 }
 

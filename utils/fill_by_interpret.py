@@ -5,9 +5,7 @@
 from math import e
 import pandas as pd
 import os
-import sys
-sys.path.append(r"d:\CodeProject\haptic_ResNet")
-import utils.dataset
+import dataset
 
 def fill_by_interpret(file_path: str,):
     '''
@@ -90,7 +88,7 @@ def batch_fill(file_list: list[str], output_dir: str = None, suffix: str = "_f")
         df = fill_by_interpret(file_path)
 
         if df is not None:
-            output_file = utils.dataset.save_data(df, file_path, output_dir=output_dir, suffix=suffix)
+            output_file = dataset.save_data(df, file_path, output_dir=output_dir, suffix=suffix)
             if output_file:
                 successful_outputs.append(output_file)
         else:
@@ -140,5 +138,5 @@ if __name__ == "__main__":
     
     # 测试批量文件处理
     
-    file_list = utils.dataset.get_file_list(r"G:\WorkFiles\科研\rokae_terrain_dataset\14\14-1-1-1")
+    file_list = dataset.get_file_list(r"G:\WorkFiles\科研\rokae_terrain_dataset\14\14-1-1-1")
     batch_fill(file_list, output_dir=r"D:\Dataset\14\14-1-1-1-f")

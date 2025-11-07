@@ -28,7 +28,7 @@ HYPERPARAMS_DIR = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
 SCALERS_DIR = 'd:/CodeProject/haptic_ResNet/models/scalers'
 DATA_DIR = 'd:/CodeProject/haptic_ResNet/data'
 MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
-RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_evaluate_Adam' 
+RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_evaluate_resnet18' 
 
 def load_data(data_root):
     """

@@ -1,3 +1,7 @@
+'''
+单独处理独立测试集的数据评估任务
+此处的独立测试集：非同一批实验条件下采集的数据
+'''
 import os
 import json
 import numpy as np

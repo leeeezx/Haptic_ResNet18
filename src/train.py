@@ -28,7 +28,7 @@ HYPERPARAMS_DIR = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
 SCALERS_DIR = 'd:/CodeProject/haptic_ResNet/models/scalers'
 DATA_DIR = 'd:/CodeProject/haptic_ResNet/data'
 MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
-RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_evaluate' 
+RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_evaluate_Adam' 
 
 def load_data(data_root):
     """
@@ -222,7 +222,8 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
 
     # 定义超参数网格
     param_grid = {
-        'lr': [0.1, 0.01, 0.001],
+        # 'lr': [0.1, 0.01, 0.001],
+        'lr': [0.001, 0.0001, 0.00001],
         'batch_size': [16, 32], # 目前笔记本测试时，发现batch=64会显存溢出，直接卡住
         'max_epochs': [100],
     }
@@ -234,7 +235,7 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
         module__num_classes=num_classes,
         max_epochs=100,
         criterion=nn.CrossEntropyLoss,
-        optimizer=torch.optim.SGD,
+        optimizer=torch.optim.Adam,
         callbacks=[
             ProgressBar(),  # 添加进度条
         ],

@@ -12,13 +12,23 @@ import re
 import json
 
 from CustomMultiChannelResNet18 import CustomMultiChannelResNet18
+from evaluation_visualizer import (
+    plot_confusion_matrix,
+    generate_and_save_classification_report,
+    plot_class_accuracies,
+    plot_roc_curves,
+    plot_prediction_samples,
+    save_evaluation_results
+)
 
 # 全局配置
 DATA_ROOT = "D:/Dataset/"
 WEIGHTS_DIR = 'd:/CodeProject/haptic_ResNet/models/weights'
 HYPERPARAMS_DIR = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
 SCALERS_DIR = 'd:/CodeProject/haptic_ResNet/models/scalers'
-MAPPING_FILE = 'terrain_mapping.json'
+DATA_DIR = 'd:/CodeProject/haptic_ResNet/data'
+MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
+RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_evaluate' 
 
 def load_data(data_root):
     """
@@ -174,9 +184,16 @@ def preprocess_data(all_data, all_labels):
     
     return X_train, X_test, y_train, y_test, scalers
 
-def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes):
+def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_mapping):
     """
     执行模型训练、超参数搜索和评估。
+    
+    Args:
+        terrain_mapping (dict): 包含 'terrain_to_index' 和 'index_to_terrain' 的字典
+    
+    Returns:
+        best_model: 训练好的最佳模型
+        evaluation_results (dict): 评估结果字典
     """
     # 6. 将Numpy数组转换为PyTorch张量
     # ==========================================
@@ -228,7 +245,7 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes):
 
     # 使用Skorch的GridSearchCV执行超参数搜索
     print("开始超参数搜索...")
-    grid_search = GridSearchCV(net, param_grid, cv=3, scoring='accuracy', n_jobs=1, verbose=3) # cv代表 进行x折交叉验证
+    grid_search = GridSearchCV(net, param_grid, cv=5, scoring='accuracy', n_jobs=1, verbose=3) # cv代表 进行x折交叉验证
     grid_search.fit(Train_data_final_tensor, y=Train_data_final_label_tensor)
 
     # 输出最佳超参数组合和验证集上的性能
@@ -241,8 +258,85 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes):
     # 在测试集上评估模型
     test_accuracy = best_model.score(Test_data_final_tensor, Test_data_final_label_tensor)
     print(f"测试集准确率: {test_accuracy:.4f}")
-
-    return best_model
+    
+    # 获取预测结果
+    y_pred = best_model.predict(Test_data_final_tensor)
+    
+    # 获取预测概率(用于ROC曲线)
+    y_score = best_model.predict_proba(Test_data_final_tensor)
+    
+    # 准备可视化所需的数据
+    index_to_terrain = terrain_mapping['index_to_terrain']
+    unique_labels = sorted(list(set(y_test.tolist())))
+    target_names = [index_to_terrain[label] for label in unique_labels]  # 移除 str(label)
+    
+    # 创建结果保存目录
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    
+    # 1. 绘制混淆矩阵
+    print("\n生成混淆矩阵...")
+    cm = plot_confusion_matrix(
+        y_test, y_pred, 
+        labels=unique_labels,
+        display_labels=target_names,
+        save_path=os.path.join(RESULTS_DIR, 'confusion_matrix.png')
+    )
+    
+    # 2. 生成分类报告
+    print("\n生成分类报告...")
+    report = generate_and_save_classification_report(
+        y_test, y_pred,
+        labels=unique_labels,
+        target_names=target_names,
+        save_path=os.path.join(RESULTS_DIR, 'classification_report.txt')
+    )
+    
+    # 3. 绘制各类别准确率
+    print("\n生成各类别准确率图...")
+    class_accuracies = plot_class_accuracies(
+        y_test, y_pred,
+        labels=unique_labels,
+        target_names=target_names,
+        save_path=os.path.join(RESULTS_DIR, 'class_accuracies.png')
+    )
+    
+    # 4. 绘制ROC曲线
+    print("\n生成ROC曲线...")
+    plot_roc_curves(
+        y_test, y_score,
+        unique_labels=unique_labels,
+        class_names=target_names,
+        save_path=os.path.join(RESULTS_DIR, 'roc_curves.png')
+    )
+    
+    # 5. 可视化预测样本
+    print("\n生成预测样本可视化...")
+    plot_prediction_samples(
+        Test_data_final_tensor, Test_data_final_label_tensor, y_pred,
+        index_to_terrain=index_to_terrain,  # 直接传递,不需要转换
+        save_path=os.path.join(RESULTS_DIR, 'prediction_samples.png'),
+        num_samples_to_show=9
+    )
+    
+    # 6. 保存评估结果JSON
+    # 从 best_params 中只提取可序列化的参数
+    best_params = grid_search.best_params_.copy()
+    
+    evaluation_results = {
+        'test_accuracy': float(test_accuracy),
+        'best_params': best_params,  # 只保存网格搜索的最佳参数
+        'class_accuracies': class_accuracies,
+        'confusion_matrix': cm.tolist()
+    }
+    
+    save_evaluation_results(
+        evaluation_results,
+        save_path=os.path.join(RESULTS_DIR, 'evaluation_results.json')
+    )
+    
+    print(f"\n所有评估结果已保存到: {RESULTS_DIR}")
+    
+    return best_model, evaluation_results
 
 def save_artifacts(model, terrain_mapping, scalers):
     """
@@ -250,6 +344,7 @@ def save_artifacts(model, terrain_mapping, scalers):
     """
     print("\n模型训练和保存完成")
     # 保存映射关系供后续使用
+    os.makedirs(DATA_DIR, exist_ok=True)
     with open(MAPPING_FILE, 'w') as f:
         json.dump(terrain_mapping, f, indent=2)
 
@@ -264,7 +359,7 @@ def save_artifacts(model, terrain_mapping, scalers):
                 os.path.join(HYPERPARAMS_DIR, 'best_model_params-100epochs.pkl'))
 
     joblib.dump(scalers, 
-                os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl'))
+                os.path.join(SCALERS_DIR, 'scalers-100epochs-train.pkl'))
     # print(f"Scalers已保存到: {os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')}")
 
 def main():
@@ -274,17 +369,15 @@ def main():
     all_data, all_labels, terrain_to_index, index_to_terrain, num_classes = load_data(DATA_ROOT)
     X_train, X_test, y_train, y_test, scalers = preprocess_data(all_data, all_labels)
 
-    # os.makedirs(SCALERS_DIR, exist_ok=True)
-    # scaler_path = os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')
-    # joblib.dump(scalers, scaler_path)
-    # print(f"Scalers已保存到: {scaler_path}")
-
-    best_model = train_and_evaluate(X_train, y_train, X_test, y_test, num_classes)
-    
     terrain_mapping = {
         'terrain_to_index': terrain_to_index,
         'index_to_terrain': index_to_terrain
     }
+    
+    best_model, evaluation_results = train_and_evaluate(
+        X_train, y_train, X_test, y_test, num_classes, terrain_mapping
+    )
+    
     save_artifacts(best_model, terrain_mapping, scalers)
 
 if __name__ == "__main__":

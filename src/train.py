@@ -123,6 +123,12 @@ def preprocess_data(all_data, all_labels):
     max_length = max(len(sample) for sample in all_data)
     print(f"数据中最长的序列长度为: {max_length}")
 
+    max_length_path = os.path.join(DATA_DIR, 'max_length.json')
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(max_length_path, 'w') as f:
+        json.dump({'max_length': max_length}, f)
+    print(f"已将max_length保存到: {max_length_path}")
+
     # 现在,对所有比 max_length 短的样本进行填充
     padded_data = []
     for sample in all_data:

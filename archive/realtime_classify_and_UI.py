@@ -229,8 +229,8 @@ class GestureClassifier:
                 num_channels=self.num_channels,
                 num_classes=self.num_classes
             )
-            self.model.load_state_dict(torch.load(self.model_path))
-            self.model.eval()
+            self.model.load_state_dict(torch.load(self.model_path)) # 加载模型权重
+            self.model.eval() # 将模型设置为评估模式
 
             # 加载Skorch模型的超参数
             self.best_model = joblib.load(self.params_path)
@@ -248,17 +248,16 @@ class GestureClassifier:
             print("模型未加载，无法进行预测")
             return None
 
-        if data.shape != (1, self.num_channels, PREDICTION_WINDOW):
+        if data.shape != (1, self.num_channels, PREDICTION_WINDOW): # 检查数据形状
             print(f"数据形状不正确: {data.shape}，期望: (1, {self.num_channels}, {PREDICTION_WINDOW})")
             return None
 
         try:
-            # 禁用梯度计算（推理阶段）
-            with torch.no_grad():
+            with torch.no_grad(): # 禁用梯度计算，提高推理效率（推理阶段）
                 outputs = self.model(data)
-                probabilities = torch.softmax(outputs, dim=1)
-                _, predicted = torch.max(outputs, 1)
-                return predicted, probabilities
+                probabilities = torch.softmax(outputs, dim=1) # 将模型输出转换为概率分布
+                _, predicted = torch.max(outputs, 1) # 模型预测的最大概率类别的索引
+                return predicted, probabilities # 返回预测类别和概率分布
         except Exception as e:
             print(f"预测失败: {e}")
             return None

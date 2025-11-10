@@ -188,9 +188,9 @@ def preprocess_data(all_data, all_labels):
         scalers.append(scaler)
     print("归一化完成")
 
-    # os.makedirs(SCALERS_DIR, exist_ok=True)
-    # scaler_path = os.path.join(SCALERS_DIR, 'scalers-100epochs-train-python3.8.10.pkl')
-    # joblib.dump(scalers, scaler_path)
+    os.makedirs(SCALERS_DIR, exist_ok=True)
+    scaler_path = os.path.join(SCALERS_DIR, 'scalers-100epochs-train-python3.8.10.pkl')
+    joblib.dump(scalers, scaler_path)
     
     return X_train, X_test, y_train, y_test, scalers
 

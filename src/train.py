@@ -187,6 +187,10 @@ def preprocess_data(all_data, all_labels):
         X_test[:, i, :] = scaler.transform(X_test[:, i, :]) # scaler应用在测试集第i个通道上
         scalers.append(scaler)
     print("归一化完成")
+
+    os.makedirs(SCALERS_DIR, exist_ok=True)
+    scaler_path = os.path.join(SCALERS_DIR, 'scalers-100epochs-train-python3.8.10.pkl')
+    joblib.dump(scalers, scaler_path)
     
     return X_train, X_test, y_train, y_test, scalers
 
@@ -366,7 +370,7 @@ def save_artifacts(model, terrain_mapping, scalers):
                 os.path.join(HYPERPARAMS_DIR, 'best_model_params-100epochs.pkl'))
 
     joblib.dump(scalers, 
-                os.path.join(SCALERS_DIR, 'scalers-100epochs-train.pkl'))
+                os.path.join(SCALERS_DIR, 'scalers-100epochs-train-python3.8.10.pkl'))
     # print(f"Scalers已保存到: {os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')}")
 
 def main():

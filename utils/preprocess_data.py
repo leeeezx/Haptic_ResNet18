@@ -265,21 +265,21 @@ if __name__ == "__main__":
     # 执行预处理
     # 示例用法：
     
-    # 1. 生成测试数据（t-开头的文件夹）
-    preprocess_and_save_data(
-        # scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",  # 注释掉
-        mode="test",
-        filter_type="prefix",
-        filter_pattern="t-"
-    )
-    
-    # 2. 生成训练数据（-p2后缀的文件夹）
+    # # 1. 生成测试数据（t-开头的文件夹）
     # preprocess_and_save_data(
     #     # scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",  # 注释掉
-    #     mode="train",
-    #     filter_type="suffix",
-    #     filter_pattern="-p2"
+    #     mode="test",
+    #     filter_type="prefix",
+    #     filter_pattern="t-"
     # )
+    
+    # 2. 生成训练数据（-p2后缀的文件夹）
+    preprocess_and_save_data(
+        # scalers_path="d:/CodeProject/haptic_ResNet/models/scalers/scalers-100epochs.pkl",  # 注释掉
+        mode="train",
+        filter_type="suffix",
+        filter_pattern="-p2"
+    )
     
     # 3. 生成训练+测试数据（包含特定字符的文件夹）
     # preprocess_and_save_data(

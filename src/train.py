@@ -28,7 +28,7 @@ HYPERPARAMS_DIR = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
 SCALERS_DIR = 'd:/CodeProject/haptic_ResNet/models/scalers'
 DATA_DIR = 'd:/CodeProject/haptic_ResNet/data'
 MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
-RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_eval_resnet18_python3.8.10' 
+RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_eval_trueResNet18_python3.8.10' 
 
 def load_data(data_root):
     """
@@ -188,9 +188,9 @@ def preprocess_data(all_data, all_labels):
         scalers.append(scaler)
     print("归一化完成")
 
-    os.makedirs(SCALERS_DIR, exist_ok=True)
-    scaler_path = os.path.join(SCALERS_DIR, 'scalers-100epochs-train-python3.8.10.pkl')
-    joblib.dump(scalers, scaler_path)
+    # os.makedirs(SCALERS_DIR, exist_ok=True)
+    # scaler_path = os.path.join(SCALERS_DIR, 'scalers-100epochs-train.pkl')
+    # joblib.dump(scalers, scaler_path)
     
     return X_train, X_test, y_train, y_test, scalers
 
@@ -362,15 +362,15 @@ def save_artifacts(model, terrain_mapping, scalers):
     # 保存PyTorch模型的权重
     os.makedirs(WEIGHTS_DIR, exist_ok=True)
     torch.save(model.module_.state_dict(), 
-               os.path.join(WEIGHTS_DIR, 'Adam-best_model_weights-100epochs-.pth'))
+               os.path.join(WEIGHTS_DIR, 'trueResNet-best_model_weights-100epochs-python3.8.0.pth'))
 
     # 保存Skorch模型的超参数
     os.makedirs(HYPERPARAMS_DIR, exist_ok=True)
     joblib.dump(model, 
-                os.path.join(HYPERPARAMS_DIR, 'Adam-best_model_params-100epochs-python3.8.10.pkl'))
+                os.path.join(HYPERPARAMS_DIR, 'trueResNet-best_model_params-100epochs-python3.8.0.pkl'))
 
     joblib.dump(scalers, 
-                os.path.join(SCALERS_DIR, 'scalers-100epochs-train-python3.8.10.pkl'))
+                os.path.join(SCALERS_DIR, 'trueResNet-scalers-100epochs-train-python3.8.10.pkl'))
     # print(f"Scalers已保存到: {os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')}")
 
 def main():

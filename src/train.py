@@ -28,7 +28,7 @@ HYPERPARAMS_DIR = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
 SCALERS_DIR = 'd:/CodeProject/haptic_ResNet/models/scalers'
 DATA_DIR = 'd:/CodeProject/haptic_ResNet/data'
 MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
-RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_eval_trueResNet18_python3.8.10' 
+RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_eval_f2_trueResNet18_maxAB_python3.8.10' 
 
 def load_data(data_root):
     """
@@ -73,7 +73,7 @@ def load_data(data_root):
         # 过滤二级目录:只保留包含 '-p2' 后缀的文件夹
         valid_subfolders = [
             subfolder for subfolder in subfolders 
-            if os.path.isdir(os.path.join(terrain_path, subfolder)) and '-p2' in subfolder
+            if os.path.isdir(os.path.join(terrain_path, subfolder)) and '-f2' in subfolder
         ]
         
         print(f"地形 {terrain_name}: 发现 {len(valid_subfolders)} 个有效子文件夹")
@@ -126,7 +126,7 @@ def preprocess_data(all_data, all_labels):
     print(f"固定序列长度为: {FIXED_LENGTH} (最大值前{BEFORE_MAX}点 + 最大值后{AFTER_MAX}点)")
     
     # 保存固定长度信息
-    max_length_path = os.path.join(DATA_DIR, 'max_before_after.json')
+    max_length_path = os.path.join(DATA_DIR, 'f2_max_before_after.json')
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(max_length_path, 'w') as f:
         json.dump({
@@ -380,15 +380,15 @@ def save_artifacts(model, terrain_mapping, scalers):
     # 保存PyTorch模型的权重
     os.makedirs(WEIGHTS_DIR, exist_ok=True)
     torch.save(model.module_.state_dict(), 
-               os.path.join(WEIGHTS_DIR, 'trueResNet-best_model_weights-100epochs-python3.8.0.pth'))
+               os.path.join(WEIGHTS_DIR, 'f2-trueResNet-best_model_weights-100epochs-python3.8.0.pth'))
 
     # 保存Skorch模型的超参数
     os.makedirs(HYPERPARAMS_DIR, exist_ok=True)
     joblib.dump(model, 
-                os.path.join(HYPERPARAMS_DIR, 'trueResNet-best_model_params-100epochs-python3.8.0.pkl'))
+                os.path.join(HYPERPARAMS_DIR, 'f2-trueResNet-best_model_params-100epochs-python3.8.0.pkl'))
 
     joblib.dump(scalers, 
-                os.path.join(SCALERS_DIR, 'trueResNet-scalers-100epochs-train-python3.8.10.pkl'))
+                os.path.join(SCALERS_DIR, 'f2-trueResNet-scalers-100epochs-train-python3.8.10.pkl'))
     # print(f"Scalers已保存到: {os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')}")
 
 def main():

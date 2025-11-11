@@ -2,10 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+from typing import List, Tuple, Optional
 import dataset
 import os
 
-def find_offset_index(input_dir: str, left_offset: float, right_offset: float) -> tuple:
+def find_offset_index(input_dir: str, left_offset: float, right_offset: float) -> Tuple[Optional[int], Optional[int]]:
     '''
     依次处理目标目录的每个文件,计算左右偏移对应的索引,返回95%分位数作为目标偏移量。
 
@@ -291,7 +292,7 @@ def part_signal_num(file_path: str, left_offset: int, right_offset: int):
         print(f"\033[91m 使用part_signal_num函数处理文件 {file_path} 时出错: {e} \033[0m")
         return None
 
-def batch_part_time(file_list: list[str], left_offset: float, right_offset: float, output_dir: str = None, suffix: str = "_f"):
+def batch_part_time(file_list: List[str], left_offset: float, right_offset: float, output_dir: str = None, suffix: str = "_f"):
     '''
     批量处理多个文件，进行周期分割
 
@@ -320,7 +321,7 @@ def batch_part_time(file_list: list[str], left_offset: float, right_offset: floa
     print(f"\n批量处理完成! 成功处理 {len(successful_outputs)}/{len(file_list)} 个文件")
     return successful_outputs
 
-def batch_part_num(file_list: list[str], left_offset: int, right_offset: int, output_dir: str = None, suffix: str = "_f"):
+def batch_part_num(file_list: List[str], left_offset: int, right_offset: int, output_dir: str = None, suffix: str = "_f"):
     '''
     批量处理多个文件，进行周期分割,并统一长度
 
@@ -398,6 +399,121 @@ def batch_part_num(file_list: list[str], left_offset: int, right_offset: int, ou
     print(f"所有文件已统一为长度: {target_length}")
     return successful_outputs
 
+# =================================================================== 选中列，删掉空白行 ==========================================================
+def filter_valid_data(file_path: str, output_dir: str = None, suffix: str = "_filtered"):
+    '''
+    过滤CSV文件中的有效数据,只保留特定列。
+    
+    **处理步骤**:
+    1. 读取CSV文件,选择/realtime_robot_poseAndextTau/data.8列
+    2. 找出该列有效数值(非空)的行索引
+    3. 只保留这些行索引对应的所有行数据
+    4. 只保留__time列和包含/realtime_robot_poseAndextTau前缀的列
+    5. 保存为新的CSV文件
+    
+    Args:
+        file_path (str): 输入CSV文件路径
+        output_dir (str): 输出目录,如果为None则使用输入文件所在目录
+        suffix (str): 文件名后缀,默认为"_filtered"
+    
+    Returns:
+        str: 输出文件路径,如果处理失败则返回None
+    '''
+    try:
+        # 1. 读取CSV文件
+        df = pd.read_csv(file_path)
+        print(f"原始文件形状: {df.shape}")
+        
+        # 检查必要的列是否存在
+        target_column = '/realtime_robot_poseAndextTau/data.8'
+        if target_column not in df.columns:
+            raise ValueError(f"CSV文件中未找到 '{target_column}' 列")
+        
+        # 2. 找出data.8列有效数值的行索引
+        # 使用pd.notna()来识别非空值
+        valid_mask = pd.notna(df[target_column])
+        valid_indices = df[valid_mask].index.tolist()
+        
+        print(f"有效数据行数: {len(valid_indices)}/{len(df)}")
+        
+        if len(valid_indices) == 0:
+            raise ValueError(f"文件 {file_path} 中没有找到有效数据")
+        
+        # 3. 只保留有效行
+        df_filtered = df.loc[valid_indices].copy()
+        
+        # 4. 识别并保留指定的列
+        # 保留__time列和所有包含/realtime_robot_poseAndextTau前缀的列
+        columns_to_keep = []
+        
+        # 添加__time列
+        if '__time' in df_filtered.columns:
+            columns_to_keep.append('__time')
+        else:
+            print("警告: 未找到 '__time' 列")
+        
+        # 添加所有包含/realtime_robot_poseAndextTau前缀的列
+        for col in df_filtered.columns:
+            if col.startswith('/realtime_robot_poseAndextTau'):
+                columns_to_keep.append(col)
+        
+        print(f"保留的列数: {len(columns_to_keep)}")
+        print(f"保留的列名: {columns_to_keep[:5]}..." if len(columns_to_keep) > 5 else f"保留的列名: {columns_to_keep}")
+        
+        # 只保留选定的列
+        df_result = df_filtered[columns_to_keep].copy()
+        
+        # 重置索引
+        df_result.reset_index(drop=True, inplace=True)
+        
+        print(f"处理后数据形状: {df_result.shape}")
+        
+        # 5. 保存为新的CSV文件
+        output_file = dataset.save_data(df_result, file_path, output_dir=output_dir, suffix=suffix)
+        
+        if output_file:
+            print(f"成功保存文件: {output_file}")
+            return output_file
+        else:
+            print("保存文件失败")
+            return None
+            
+    except Exception as e:
+        print(f"\033[91m filter_valid_data函数处理文件 {file_path} 时出错: {e} \033[0m")
+        return None
+
+def batch_filter_valid_data(file_list: List[str], output_dir: str = None, suffix: str = "_f2"):
+    '''
+    批量过滤多个CSV文件的有效数据
+    
+    Args:
+        file_list (list[str]): 待处理的文件路径列表
+        output_dir (str): 输出目录,如果为None则使用输入文件所在目录
+        suffix (str): 文件名后缀,默认为"_filtered"
+    
+    Returns:
+        list[str]: 成功处理并保存的文件路径列表
+    '''
+    successful_outputs = []
+    
+    for i, file_path in enumerate(file_list):
+        print(f"\n{'='*80}")
+        print(f"处理第 {i+1}/{len(file_list)} 个文件: {os.path.basename(file_path)}")
+        print(f"{'='*80}")
+        
+        output_file = filter_valid_data(file_path, output_dir=output_dir, suffix=suffix)
+        
+        if output_file:
+            successful_outputs.append(output_file)
+        else:
+            print(f"\033[91m 文件 {file_path} 处理失败,跳过 \033[0m")
+    
+    print(f"\n{'='*80}")
+    print(f"批量处理完成! 成功处理 {len(successful_outputs)}/{len(file_list)} 个文件")
+    print(f"{'='*80}")
+    
+    return successful_outputs
+
 
 if __name__ == "__main__":
 # ================================== 批量分割周期信号 ========================================
@@ -410,89 +526,16 @@ if __name__ == "__main__":
 # ================================== 计算偏移量索引 ========================================
     # find_offset_index(r"D:\Dataset\14\14-1-1-1-p", left_offset=1.5, right_offset=6.8)
 
-# ================================== 批量分割周期信号 ========================================
-    file_list = dataset.get_file_list(r"D:\Dataset\14\14-1-1-1-p")
-    batch_part_num(file_list, 
-               left_offset=1531, right_offset=6911, 
-               output_dir=r"D:\Dataset\14\14-1-1-1-p2", 
-               suffix="_p2")
+# # ================================== 批量分割周期信号 ========================================
+#     file_list = dataset.get_file_list(r"D:\Dataset\14\14-1-1-1-p")
+#     batch_part_num(file_list, 
+#                left_offset=1531, right_offset=6911, 
+#                output_dir=r"D:\Dataset\14\14-1-1-1-p2", 
+#                suffix="_p2")
 
-
-# ==================================== 原程序（by乔州） ==============================================
-# # 数据读取（三列）
-# rawdata = pd.read_excel(r"F:\cnn手臂信号\2025.10.19\处理后数据\1.xlsx")
-# array1 = rawdata.values
-# x = array1[:, 2]  # 修改这里：使用第三列进行峰值检测（索引2表示第三列）
-
-# # 峰谷检测
-# peaks_max, _ = find_peaks(x, height=0.2, distance=500)
-# peaks_min, _ = find_peaks(x, height=0.005, distance=500)
-
-# # 峰谷配对
-# min_count = min(len(peaks_max), len(peaks_min))
-# peaks_max = peaks_max[:min_count]
-# peaks_min = peaks_min[:min_count]
-
-# # 计算中心点
-# Xave = ((peaks_min + peaks_max) / 2).astype(int)
-# Xleft = np.clip(Xave - 300, 0, len(array1))
-# Xright = np.clip(Xave + 300, 0, len(array1))
-
-# # 创建空DataFrame用于存储结果
-# output_columns = []
-# segment_lengths = []
-
-# # 收集所有分段数据
-# for i, (left, right) in enumerate(zip(Xleft, Xright)):
-#     seg = array1[left:right]
-#     seg_length = len(seg)
-
-#     # 创建合并列：通道1 + 通道2 + 通道3
-#     combined = np.zeros(seg_length * 3)
-#     combined[0:seg_length] = seg[:, 0]  # 通道1数据
-#     combined[seg_length:2 * seg_length] = seg[:, 1]  # 通道2数据
-#     combined[2 * seg_length:3 * seg_length] = seg[:, 2]  # 通道3数据
-
-#     output_columns.append(combined)
-#     segment_lengths.append(len(combined))
-
-# # 确保所有分段长度一致
-# max_length = max(segment_lengths) if segment_lengths else 0
-# all_data = []
-
-# for col in output_columns:
-#     if len(col) < max_length:
-#         # 填充NaN使长度一致
-#         padded = np.full(max_length, np.nan)
-#         padded[:len(col)] = col
-#         all_data.append(padded)
-#     else:
-#         all_data.append(col)
-
-# # 创建DataFrame并保存
-# df_out = pd.DataFrame(all_data).T
-# df_out.to_excel(r"F:\cnn手臂信号\2025.10.19\处理后数据\切割后数据\1.xlsx", index=False)
-
-# # 可视化（更新以反映使用第三列进行峰值检测）
-# plt.figure(figsize=(12, 8))
-# plt.subplot(3, 1, 1)
-# plt.plot(array1[:, 0], label='Column 1')
-# plt.vlines(Xave, ymin=np.nanmin(array1[:, 0]), ymax=np.nanmax(array1[:, 0]), colors='r', linestyles='dashed', alpha=0.5)
-
-# plt.subplot(3, 1, 2)
-# plt.plot(x, label='Column 3 (Peak Detection)')  # 更新标签
-# plt.plot(peaks_max, x[peaks_max], "x", markersize=10, label='Peaks')
-# plt.plot(peaks_min, x[peaks_min], "o", markersize=8, label='Valleys')
-
-# plt.subplot(3, 1, 3)
-# plt.plot(array1[:, 1], label='Column 2')  # 更新为显示第二列
-# plt.vlines(Xave, ymin=np.nanmin(array1[:, 1]), ymax=np.nanmax(array1[:, 1]), colors='r', linestyles='dashed', alpha=0.5)
-
-# plt.tight_layout()
-# plt.suptitle(f"Detected {len(Xave)} periods - 3 Columns Processing (Using Column 3 for Peak Detection)")
-# plt.show()
-
-# print(f"成功处理 {len(Xave)} 个周期，每个周期包含 {max_length // 3} 个数据点")
-# print(f"输出数据形状: {df_out.shape} (行数: {max_length}, 列数: {len(Xave)})")
-# print(f"每列数据包含: 前{max_length // 3}行为通道1, 中间{max_length // 3}行为通道2, 后{max_length // 3}行为通道3")
+# ================================== 过滤有效数据 ========================================
+    file_list = dataset.get_file_list(r"G:\WorkFiles\科研\rokae_terrain_dataset\14\14-1-1-1")
+    batch_filter_valid_data(file_list, 
+                           output_dir=r"D:\Dataset\14\14-1-1-1-f2", 
+                           suffix="_f2")
 

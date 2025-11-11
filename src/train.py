@@ -104,7 +104,7 @@ def load_data(data_root):
 
 def preprocess_data(all_data, all_labels):
     """
-    对加载的数据进行预处理，包括填充、格式转换、划分和归一化。
+    对加载的数据进行预处理,包括截取、填充、格式转换、划分和归一化。
 
     Args:   
         all_data (list of np.ndarray): 加载的所有样本数据
@@ -117,80 +117,98 @@ def preprocess_data(all_data, all_labels):
         y_test (np.ndarray): 测试集标签
         scalers (list of MinMaxScaler): 用于归一化的scaler列表
     """
-    # 2.5. 对所有样本进行长度统一(Padding)
+    # 2.5. 对所有样本进行截取和填充
     # ==========================================
-    # 计算所有样本中的最大序列长度
-    max_length = max(len(sample) for sample in all_data)
-    print(f"数据中最长的序列长度为: {max_length}")
-
-    max_length_path = os.path.join(DATA_DIR, 'max_length.json')
+    BEFORE_MAX = 1600  # 最大值前的点数
+    AFTER_MAX = 7000   # 最大值后的点数
+    FIXED_LENGTH = BEFORE_MAX + AFTER_MAX  # 固定序列长度为 8600
+    
+    print(f"固定序列长度为: {FIXED_LENGTH} (最大值前{BEFORE_MAX}点 + 最大值后{AFTER_MAX}点)")
+    
+    # 保存固定长度信息
+    max_length_path = os.path.join(DATA_DIR, 'max_before_after.json')
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(max_length_path, 'w') as f:
-        json.dump({'max_length': max_length}, f)
-    print(f"已将max_length保存到: {max_length_path}")
+        json.dump({
+            'max_length': FIXED_LENGTH,
+            'before_max': BEFORE_MAX,
+            'after_max': AFTER_MAX
+        }, f)
+    print(f"已将序列长度配置保存到: {max_length_path}")
 
-    # 现在,对所有比 max_length 短的样本进行填充
-    padded_data = []
-    for sample in all_data:
+    # 对所有样本进行截取和填充
+    processed_data = []
+    for idx, sample in enumerate(all_data):
         # sample 的形状是 (序列长度, 2)
-        len_sample = len(sample)
-        if len_sample < max_length:
-            # 计算需要填充的长度
-            padding_size = max_length - len_sample
-            # 使用 numpy.pad 进行填充
-            # ((0, padding_size), (0, 0)) 的意思是:
-            # - 在第0维(序列长度维度)上,前面不填充(0),后面填充(padding_size)
-            # - 在第1维(通道维度)上,前后都不填充(0)
-            padded_sample = np.pad(sample, ((0, padding_size), (0, 0)), 'constant', constant_values=0)
-            padded_data.append(padded_sample)
-        else:
-            padded_data.append(sample)
-    print(f"Padding完成,所有样本长度已统一为: {max_length}")
+        # 第0列是 data.2, 第1列是 data.8
+        force_column = sample[:, 1]  # data.8 列
+        
+        # 找到最大值的索引
+        max_idx = np.argmax(force_column)
+        
+        # 计算起始和结束索引
+        start_idx = max_idx - BEFORE_MAX
+        end_idx = max_idx + AFTER_MAX
+        
+        # 初始化一个固定长度的数组,用0填充
+        processed_sample = np.zeros((FIXED_LENGTH, 2))
+        
+        # 计算实际可用的数据范围
+        # 如果start_idx < 0,说明前面不足,需要填充
+        # 如果end_idx > len(sample),说明后面不足,需要填充
+        actual_start = max(0, start_idx)
+        actual_end = min(len(sample), end_idx)
+        
+        # 计算在processed_sample中的放置位置
+        target_start = max(0, -start_idx)  # 如果start_idx<0,前面需要填充的量
+        target_end = target_start + (actual_end - actual_start)
+        
+        # 将实际数据复制到目标位置
+        processed_sample[target_start:target_end, :] = sample[actual_start:actual_end, :]
+        
+        processed_data.append(processed_sample)
+    
+    print(f"截取和填充完成,所有样本长度已统一为: {FIXED_LENGTH}")
 
     # 3. 将数据列表转换为一个大的Numpy数组
     # ==========================================
-    # np.array(padded_data) 会创建一个形状为 (样本数, 序列长度, 2) 的数组
-    # 现在所有样本的序列长度都是 max_length
-    X = np.array(padded_data)
+    # np.array(processed_data) 会创建一个形状为 (样本数, 序列长度, 2) 的数组
+    X = np.array(processed_data)
     y = np.array(all_labels)
 
     # 我们的模型需要输入的形状是 (样本数, 通道数, 序列长度)
-    # 所以需要交换最后两个维度 (600, 2) -> (2, 600)
-    # transpose(0, 2, 1) 的意思是：保持第0维（样本数）不变，将第2维（通道数）和第1维（序列长度）交换
+    # 所以需要交换最后两个维度 (8600, 2) -> (2, 8600)
+    # transpose(0, 2, 1) 的意思是:保持第0维(样本数)不变,将第2维(通道数)和第1维(序列长度)交换
     X = X.transpose(0, 2, 1)
 
-    print(f"原始数据形状 (X): {X.shape}") # 应该打印 (样本数, 2, max_length)
+    print(f"原始数据形状 (X): {X.shape}") # 应该打印 (样本数, 2, 8600)
     print(f"标签数据形状 (y): {y.shape}")   # 应该打印 (样本数,)
 
     # 4. 划分训练集和测试集
     # ==========================================
-    # 这是评估模型性能的关键一步。我们用80%的数据训练，20%的数据测试。
+    # 这是评估模型性能的关键一步。我们用80%的数据训练,20%的数据测试。
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, 
         test_size=0.2,    # 20%作为测试集
-        random_state=42,  # 保证每次划分结果都一样，方便复现
+        random_state=42,  # 保证每次划分结果都一样,方便复现
         stratify=y        # 确保训练集和测试集中各类别的比例与原始数据一致
     )
     print(f"训练集大小: {X_train.shape}, 测试集大小: {X_test.shape}")
 
     # 5. 数据归一化 (Min-Max Scaling)
     # ==========================================
-    # 归一化可以加速模型训练，提升性能
-    # 重要原则：只能在训练集上 `fit`（学习缩放规则），然后用这个规则去 `transform`（应用规则）训练集和测试集
+    # 归一化可以加速模型训练,提升性能
+    # 重要原则:只能在训练集上 `fit`(学习缩放规则),然后用这个规则去 `transform`(应用规则)训练集和测试集
     # 这样可以防止测试集的信息泄露给训练过程
     print("开始归一化处理...")
     scalers = []  
     # 我们需要对每个通道分别进行归一化
-    for i in range(X_train.shape[1]):  # X_train.shape[1] 就是通道数，这里是 2
+    for i in range(X_train.shape[1]):  # X_train.shape[1] 就是通道数,这里是 2
         scaler = MinMaxScaler()
         X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :]) # scaler学习训练集第i个通道的缩放规则
         X_test[:, i, :] = scaler.transform(X_test[:, i, :]) # scaler应用在测试集第i个通道上
         scalers.append(scaler)
     print("归一化完成")
-
-    # os.makedirs(SCALERS_DIR, exist_ok=True)
-    # scaler_path = os.path.join(SCALERS_DIR, 'scalers-100epochs-train.pkl')
-    # joblib.dump(scalers, scaler_path)
     
     return X_train, X_test, y_train, y_test, scalers
 

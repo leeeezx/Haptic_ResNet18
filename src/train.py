@@ -70,10 +70,10 @@ def load_data(data_root):
         
         terrain_path = os.path.join(data_root, terrain_name)
         subfolders = os.listdir(terrain_path) # 获取一级目录地形文件夹下的所有子文件夹
-        # 过滤二级目录:只保留包含 '-p2' 后缀的文件夹
+        # 过滤二级目录:只保留包含 '-p' 后缀的文件夹
         valid_subfolders = [
             subfolder for subfolder in subfolders 
-            if os.path.isdir(os.path.join(terrain_path, subfolder)) and subfolder.endswith('-p2')
+            if os.path.isdir(os.path.join(terrain_path, subfolder)) and subfolder.endswith('-p')
         ]
         
         print(f"地形 {terrain_name}: 发现 {len(valid_subfolders)} 个有效子文件夹")
@@ -104,7 +104,7 @@ def load_data(data_root):
 
 def preprocess_data(all_data, all_labels):
     """
-    对加载的数据进行预处理,使用状态机逻辑进行数据截取、填充、格式转换、划分和归一化。
+    对加载的数据进行预处理,使用峰值截取逻辑进行数据截取、填充、格式转换、划分和归一化。
 
     Args:   
         all_data (list of np.ndarray): 加载的所有样本数据
@@ -117,17 +117,15 @@ def preprocess_data(all_data, all_labels):
         y_test (np.ndarray):  测试集标签
         scalers (list of MinMaxScaler): 用于归一化的scaler列表
     """
-    # 2.5. 使用状态机逻辑对所有样本进行截取和填充
+    # 2.5. 使用峰值截取逻辑对所有样本进行截取和填充
     # ==========================================
-    # 触发参数 (与realtime_recognizer保持一致)
+    # 触发参数
     FORCE_THRESHOLD = -18       # 力阈值,用于判断是否发生接触
     CONTACT_DEBOUNCE_COUNT = 200  # 连续N次力值超过阈值才确认为接触开始
-    RELEASE_DEBOUNCE_COUNT = 200  # 连续M次力值低于阈值才确认为接触结束
     
-    print(f"使用状态机逻辑进行数据截取:")
+    print(f"使用峰值截取逻辑进行数据截取:")
     print(f"  - 力阈值: {FORCE_THRESHOLD}")
     print(f"  - 接触去抖动计数: {CONTACT_DEBOUNCE_COUNT}")
-    print(f"  - 释放去抖动计数: {RELEASE_DEBOUNCE_COUNT}")
     
     # 定义状态枚举
     WAITING = 0
@@ -145,7 +143,6 @@ def preprocess_data(all_data, all_labels):
         # 初始化状态机
         state = WAITING
         contact_counter = 0
-        release_counter = 0
         contact_start_idx = -1
         contact_data_indices = []
         
@@ -177,19 +174,18 @@ def preprocess_data(all_data, all_labels):
             
             elif state == RECORDING:
                 contact_data_indices.append(i)
-                
-                # 检查是否需要结束记录
-                if force < FORCE_THRESHOLD:
-                    release_counter += 1
-                    if release_counter >= RELEASE_DEBOUNCE_COUNT:
-                        # 确认接触结束,提取数据
-                        break
-                else:
-                    release_counter = 0
         
-        # 提取截取的数据
+        # 提取接触数据并找到峰值
         if contact_data_indices:
-            extracted_sample = sample[contact_data_indices, :]
+            contact_forces = force_column[contact_data_indices]
+            
+            # 找到最大值的索引(相对于contact_data_indices)
+            max_idx_relative = np.argmax(contact_forces)
+            
+            # 截取从开始到最大值(包含最大值)的数据
+            truncated_indices = contact_data_indices[:max_idx_relative + 1]
+            extracted_sample = sample[truncated_indices, :]
+            
             processed_data.append(extracted_sample)
             
             # 更新最大长度
@@ -198,22 +194,25 @@ def preprocess_data(all_data, all_labels):
         else:
             # 如果没有检测到有效接触,使用原始数据
             print(f"警告: 样本 {idx} 未检测到有效接触,使用原始数据")
-            processed_data.append(sample)
-            if len(sample) > max_length:
-                max_length = len(sample)
+            # 对原始数据也执行峰值截取
+            max_idx = np.argmax(force_column)
+            extracted_sample = sample[:max_idx + 1, :]
+            processed_data.append(extracted_sample)
+            if len(extracted_sample) > max_length:
+                max_length = len(extracted_sample)
     
-    print(f"状态机截取完成,检测到的最大序列长度: {max_length}")
+    print(f"峰值截取完成,检测到的最大序列长度: {max_length}")
     
-    # 2.6. 填充所有样本到max_length
+    # 2.6. 填充所有样本到max_length (后填充)
     # ==========================================
-    print(f"开始填充所有样本到固定长度: {max_length}")
+    print(f"开始在后面填充所有样本到固定长度: {max_length}")
     
     padded_data = []
     for sample in processed_data:
         if len(sample) < max_length:
             # 创建填充后的数组
             padded_sample = np.zeros((max_length, 2), dtype=np.float32)
-            # 将原始数据复制到开头
+            # 将原始数据复制到开头,后面自动填充0
             padded_sample[:len(sample), :] = sample
             padded_data.append(padded_sample)
         else:
@@ -221,20 +220,20 @@ def preprocess_data(all_data, all_labels):
     
     print(f"填充完成,所有样本长度已统一为: {max_length}")
     
-    # 保存状态机配置和最大长度信息
-    state_machine_config = {
+    # 保存峰值截取配置和最大长度信息
+    peak_truncation_config = {
         'max_length': int(max_length),
         'force_threshold': FORCE_THRESHOLD,
         'contact_debounce_count': CONTACT_DEBOUNCE_COUNT,
-        'release_debounce_count': RELEASE_DEBOUNCE_COUNT,
-        'method': 'state_machine'
+        'method': 'peak_truncation',
+        'padding': 'post'  # 标记使用后填充
     }
     
-    config_path = os.path.join(DATA_DIR, 'state_machine_config.json')
+    config_path = os.path.join(DATA_DIR, 'preprocessing_config.json')
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(config_path, 'w') as f:
-        json.dump(state_machine_config, f, indent=2)
-    print(f"已将状态机配置保存到: {config_path}")
+        json.dump(peak_truncation_config, f, indent=2)
+    print(f"已将预处理配置保存到: {config_path}")
 
     # 3. 将数据列表转换为一个大的Numpy数组
     # ==========================================

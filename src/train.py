@@ -104,7 +104,7 @@ def load_data(data_root):
 
 def preprocess_data(all_data, all_labels):
     """
-    对加载的数据进行预处理,包括截取、填充、格式转换、划分和归一化。
+    对加载的数据进行预处理,使用状态机逻辑进行数据截取、填充、格式转换、划分和归一化。
 
     Args:   
         all_data (list of np.ndarray): 加载的所有样本数据
@@ -117,96 +117,155 @@ def preprocess_data(all_data, all_labels):
         y_test (np.ndarray): 测试集标签
         scalers (list of MinMaxScaler): 用于归一化的scaler列表
     """
-    # 2.5. 对所有样本进行截取和填充
+    # 2.5. 使用状态机逻辑对所有样本进行截取和填充
     # ==========================================
-    BEFORE_MAX = 1600  # 最大值前的点数
-    AFTER_MAX = 7000   # 最大值后的点数
-    FIXED_LENGTH = BEFORE_MAX + AFTER_MAX  # 固定序列长度为 8600
+    # 触发参数 (与realtime_recognizer保持一致)
+    FORCE_THRESHOLD = -18       # 力阈值,用于判断是否发生接触
+    CONTACT_DEBOUNCE_COUNT = 200  # 连续N次力值超过阈值才确认为接触开始
+    RELEASE_DEBOUNCE_COUNT = 200  # 连续M次力值低于阈值才确认为接触结束
     
-    print(f"固定序列长度为: {FIXED_LENGTH} (最大值前{BEFORE_MAX}点 + 最大值后{AFTER_MAX}点)")
+    print(f"使用状态机逻辑进行数据截取:")
+    print(f"  - 力阈值: {FORCE_THRESHOLD}")
+    print(f"  - 接触去抖动计数: {CONTACT_DEBOUNCE_COUNT}")
+    print(f"  - 释放去抖动计数: {RELEASE_DEBOUNCE_COUNT}")
     
-    # 保存固定长度信息
-    max_length_path = os.path.join(DATA_DIR, 'f2_max_before_after.json')
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(max_length_path, 'w') as f:
-        json.dump({
-            'max_length': FIXED_LENGTH,
-            'before_max': BEFORE_MAX,
-            'after_max': AFTER_MAX
-        }, f)
-    print(f"已将序列长度配置保存到: {max_length_path}")
-
-    # 对所有样本进行截取和填充
+    # 定义状态枚举
+    WAITING = 0
+    RECORDING = 1
+    
+    # 对所有样本进行截取
     processed_data = []
+    max_length = 0  # 记录所有截取数据中的最大长度
+    
     for idx, sample in enumerate(all_data):
         # sample 的形状是 (序列长度, 2)
         # 第0列是 data.2, 第1列是 data.8
         force_column = sample[:, 1]  # data.8 列
         
-        # 找到最大值的索引
-        max_idx = np.argmax(force_column)
+        # 初始化状态机
+        state = WAITING
+        contact_counter = 0
+        release_counter = 0
+        contact_start_idx = -1
+        contact_data_indices = []
         
-        # 计算起始和结束索引
-        start_idx = max_idx - BEFORE_MAX
-        end_idx = max_idx + AFTER_MAX
+        # 使用循环缓冲区保存历史数据索引
+        buffer_indices = []
         
-        # 初始化一个固定长度的数组,用0填充
-        processed_sample = np.zeros((FIXED_LENGTH, 2))
+        # 遍历样本数据,执行状态机逻辑
+        for i in range(len(force_column)):
+            force = force_column[i]
+            
+            if state == WAITING:
+                # 始终将索引加入缓冲区
+                buffer_indices.append(i)
+                if len(buffer_indices) > CONTACT_DEBOUNCE_COUNT + 100:
+                    buffer_indices.pop(0)  # 保持缓冲区大小
+                
+                # 检查是否需要开始记录
+                if force > FORCE_THRESHOLD:
+                    contact_counter += 1
+                    if contact_counter >= CONTACT_DEBOUNCE_COUNT:
+                        # 确认接触开始
+                        state = RECORDING
+                        # 将缓冲区中的历史索引复制到contact_data_indices
+                        contact_data_indices = list(buffer_indices)
+                        contact_start_idx = i
+                        contact_counter = 0
+                else:
+                    contact_counter = 0
+            
+            elif state == RECORDING:
+                contact_data_indices.append(i)
+                
+                # 检查是否需要结束记录
+                if force < FORCE_THRESHOLD:
+                    release_counter += 1
+                    if release_counter >= RELEASE_DEBOUNCE_COUNT:
+                        # 确认接触结束,提取数据
+                        break
+                else:
+                    release_counter = 0
         
-        # 计算实际可用的数据范围
-        # 如果start_idx < 0,说明前面不足,需要填充
-        # 如果end_idx > len(sample),说明后面不足,需要填充
-        actual_start = max(0, start_idx)
-        actual_end = min(len(sample), end_idx)
-        
-        # 计算在processed_sample中的放置位置
-        target_start = max(0, -start_idx)  # 如果start_idx<0,前面需要填充的量
-        target_end = target_start + (actual_end - actual_start)
-        
-        # 将实际数据复制到目标位置
-        processed_sample[target_start:target_end, :] = sample[actual_start:actual_end, :]
-        
-        processed_data.append(processed_sample)
+        # 提取截取的数据
+        if contact_data_indices:
+            extracted_sample = sample[contact_data_indices, :]
+            processed_data.append(extracted_sample)
+            
+            # 更新最大长度
+            if len(extracted_sample) > max_length:
+                max_length = len(extracted_sample)
+        else:
+            # 如果没有检测到有效接触,使用原始数据
+            print(f"警告: 样本 {idx} 未检测到有效接触,使用原始数据")
+            processed_data.append(sample)
+            if len(sample) > max_length:
+                max_length = len(sample)
     
-    print(f"截取和填充完成,所有样本长度已统一为: {FIXED_LENGTH}")
+    print(f"状态机截取完成,检测到的最大序列长度: {max_length}")
+    
+    # 2.6. 填充所有样本到max_length
+    # ==========================================
+    print(f"开始填充所有样本到固定长度: {max_length}")
+    
+    padded_data = []
+    for sample in processed_data:
+        if len(sample) < max_length:
+            # 创建填充后的数组
+            padded_sample = np.zeros((max_length, 2), dtype=np.float32)
+            # 将原始数据复制到开头
+            padded_sample[:len(sample), :] = sample
+            padded_data.append(padded_sample)
+        else:
+            padded_data.append(sample)
+    
+    print(f"填充完成,所有样本长度已统一为: {max_length}")
+    
+    # 保存状态机配置和最大长度信息
+    state_machine_config = {
+        'max_length': int(max_length),
+        'force_threshold': FORCE_THRESHOLD,
+        'contact_debounce_count': CONTACT_DEBOUNCE_COUNT,
+        'release_debounce_count': RELEASE_DEBOUNCE_COUNT,
+        'method': 'state_machine'
+    }
+    
+    config_path = os.path.join(DATA_DIR, 'f2_state_machine_config.json')
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(config_path, 'w') as f:
+        json.dump(state_machine_config, f, indent=2)
+    print(f"已将状态机配置保存到: {config_path}")
 
     # 3. 将数据列表转换为一个大的Numpy数组
     # ==========================================
-    # np.array(processed_data) 会创建一个形状为 (样本数, 序列长度, 2) 的数组
-    X = np.array(processed_data)
+    X = np.array(padded_data)
     y = np.array(all_labels)
 
     # 我们的模型需要输入的形状是 (样本数, 通道数, 序列长度)
-    # 所以需要交换最后两个维度 (8600, 2) -> (2, 8600)
-    # transpose(0, 2, 1) 的意思是:保持第0维(样本数)不变,将第2维(通道数)和第1维(序列长度)交换
+    # 所以需要交换最后两个维度 (max_length, 2) -> (2, max_length)
     X = X.transpose(0, 2, 1)
 
-    print(f"原始数据形状 (X): {X.shape}") # 应该打印 (样本数, 2, 8600)
+    print(f"原始数据形状 (X): {X.shape}") # 应该打印 (样本数, 2, max_length)
     print(f"标签数据形状 (y): {y.shape}")   # 应该打印 (样本数,)
 
     # 4. 划分训练集和测试集
     # ==========================================
-    # 这是评估模型性能的关键一步。我们用80%的数据训练,20%的数据测试。
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, 
-        test_size=0.2,    # 20%作为测试集
-        random_state=42,  # 保证每次划分结果都一样,方便复现
-        stratify=y        # 确保训练集和测试集中各类别的比例与原始数据一致
+        test_size=0.2,
+        random_state=42,
+        stratify=y
     )
     print(f"训练集大小: {X_train.shape}, 测试集大小: {X_test.shape}")
 
     # 5. 数据归一化 (Min-Max Scaling)
     # ==========================================
-    # 归一化可以加速模型训练,提升性能
-    # 重要原则:只能在训练集上 `fit`(学习缩放规则),然后用这个规则去 `transform`(应用规则)训练集和测试集
-    # 这样可以防止测试集的信息泄露给训练过程
     print("开始归一化处理...")
     scalers = []  
-    # 我们需要对每个通道分别进行归一化
-    for i in range(X_train.shape[1]):  # X_train.shape[1] 就是通道数,这里是 2
+    for i in range(X_train.shape[1]):
         scaler = MinMaxScaler()
-        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :]) # scaler学习训练集第i个通道的缩放规则
-        X_test[:, i, :] = scaler.transform(X_test[:, i, :]) # scaler应用在测试集第i个通道上
+        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :])
+        X_test[:, i, :] = scaler.transform(X_test[:, i, :])
         scalers.append(scaler)
     print("归一化完成")
     

@@ -73,7 +73,7 @@ def load_data(data_root):
         # 过滤二级目录:只保留包含 '-p2' 后缀的文件夹
         valid_subfolders = [
             subfolder for subfolder in subfolders 
-            if os.path.isdir(os.path.join(terrain_path, subfolder)) and '-f2' in subfolder
+            if os.path.isdir(os.path.join(terrain_path, subfolder)) and 'TODO' in subfolder
         ]
         
         print(f"地形 {terrain_name}: 发现 {len(valid_subfolders)} 个有效子文件夹")

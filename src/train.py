@@ -28,7 +28,7 @@ HYPERPARAMS_DIR = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
 SCALERS_DIR = 'd:/CodeProject/haptic_ResNet/models/scalers'
 DATA_DIR = 'd:/CodeProject/haptic_ResNet/data'
 MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
-RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_eval_f2_trueResNet18_maxAB_python3.8.10' 
+RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_eval_p_trueResNet18_state_python3.8.10' 
 
 def load_data(data_root):
     """
@@ -73,7 +73,7 @@ def load_data(data_root):
         # 过滤二级目录:只保留包含 '-p2' 后缀的文件夹
         valid_subfolders = [
             subfolder for subfolder in subfolders 
-            if os.path.isdir(os.path.join(terrain_path, subfolder)) and 'TODO' in subfolder
+            if os.path.isdir(os.path.join(terrain_path, subfolder)) and subfolder.endswith('-p2')
         ]
         
         print(f"地形 {terrain_name}: 发现 {len(valid_subfolders)} 个有效子文件夹")
@@ -112,9 +112,9 @@ def preprocess_data(all_data, all_labels):
     
     Returns:
         X_train (np.ndarray): 训练集数据
-        X_test (np.ndarray): 测试集数据
+        X_test (np.ndarray):  测试集数据
         y_train (np.ndarray): 训练集标签
-        y_test (np.ndarray): 测试集标签
+        y_test (np.ndarray):  测试集标签
         scalers (list of MinMaxScaler): 用于归一化的scaler列表
     """
     # 2.5. 使用状态机逻辑对所有样本进行截取和填充
@@ -230,7 +230,7 @@ def preprocess_data(all_data, all_labels):
         'method': 'state_machine'
     }
     
-    config_path = os.path.join(DATA_DIR, 'f2_state_machine_config.json')
+    config_path = os.path.join(DATA_DIR, 'state_machine_config.json')
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(config_path, 'w') as f:
         json.dump(state_machine_config, f, indent=2)
@@ -252,7 +252,7 @@ def preprocess_data(all_data, all_labels):
     # ==========================================
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, 
-        test_size=0.2,
+        test_size=0.2, # 20%作为测试集
         random_state=42,
         stratify=y
     )
@@ -439,15 +439,15 @@ def save_artifacts(model, terrain_mapping, scalers):
     # 保存PyTorch模型的权重
     os.makedirs(WEIGHTS_DIR, exist_ok=True)
     torch.save(model.module_.state_dict(), 
-               os.path.join(WEIGHTS_DIR, 'f2-trueResNet-best_model_weights-100epochs-python3.8.0.pth'))
+               os.path.join(WEIGHTS_DIR, 'p-trueResNet-bmw-100epochs-state-python3.8.0.pth'))
 
     # 保存Skorch模型的超参数
     os.makedirs(HYPERPARAMS_DIR, exist_ok=True)
     joblib.dump(model, 
-                os.path.join(HYPERPARAMS_DIR, 'f2-trueResNet-best_model_params-100epochs-python3.8.0.pkl'))
+                os.path.join(HYPERPARAMS_DIR, 'p-trueResNet-bmp-100epochs-state-python3.8.0.pkl'))
 
     joblib.dump(scalers, 
-                os.path.join(SCALERS_DIR, 'f2-trueResNet-scalers-100epochs-train-python3.8.10.pkl'))
+                os.path.join(SCALERS_DIR, 'p-trueResNet-scalers-100epochs-train-state-python3.8.10.pkl'))
     # print(f"Scalers已保存到: {os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')}")
 
 def main():

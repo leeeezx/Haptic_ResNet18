@@ -1,0 +1,7 @@
+{
+  "max_length": 36072,
+  "force_threshold": -18,
+  "contact_debounce_count": 200,
+  "release_debounce_count": 200,
+  "method": "state_machine"
+}

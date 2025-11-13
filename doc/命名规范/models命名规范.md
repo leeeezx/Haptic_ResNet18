@@ -6,7 +6,8 @@
 **Adam、SGD**：优化器种类
 **trueResNet**：优化后的ResNet模型架构
 
-**bsp**：best model params
+**bmp**：best model params
+**bmw**：best model weights
 **xxx epochs**: xxx epochs
 
 **maxAB**：输入的训练数据分割方法为，找到峰值，前后固定长度。（仅在train中临时处理，不对原始数据修改）

@@ -11,7 +11,13 @@ from sklearn.metrics import confusion_matrix, classification_report, ConfusionMa
 from sklearn.preprocessing import label_binarize
 from itertools import cycle
 
-plt.rcParams['font.sans-serif'] = ['SimHei']  # 用黑体显示中文
+plt.rcParams['font.sans-serif'] = [    
+    'Noto Sans CJK SC',  # Google Noto字体，简体中文
+    'AR PL UMing CN',    # 文鼎明体
+    'AR PL UKai CN',     # 文鼎楷体
+    'WenQuanYi Zen Hei', # 文泉驿正黑（如果安装了）
+    'DejaVu Sans'
+]        # 回退到英文字体]  # 用黑体显示中文
 plt.rcParams['axes.unicode_minus'] = False    # 正常显示负号
 
 def plot_confusion_matrix(y_true, y_pred, labels, display_labels, save_path):

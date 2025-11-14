@@ -3,13 +3,23 @@ import torch.nn as nn
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
+from skorch.dataset import ValidSplit
 from sklearn.preprocessing import MinMaxScaler
 from skorch import NeuralNetClassifier
-from skorch.callbacks import ProgressBar
+from skorch.callbacks import ProgressBar, EpochScoring
 import joblib
 import os
 import re
 import json
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = [    
+    'Noto Sans CJK SC',  # Google Noto字体，简体中文
+    'AR PL UMing CN',    # 文鼎明体
+    'AR PL UKai CN',     # 文鼎楷体
+    'WenQuanYi Zen Hei', # 文泉驿正黑（如果安装了）
+    'DejaVu Sans'
+]        # 回退到英文字体]  # 用黑体显示中文
+plt.rcParams['axes.unicode_minus'] = False    # 正常显示负号
 
 from CustomMultiChannelResNet18 import CustomMultiChannelResNet18
 from evaluation_visualizer import (
@@ -22,13 +32,13 @@ from evaluation_visualizer import (
 )
 
 # 全局配置
-DATA_ROOT = "D:/Dataset/"
-WEIGHTS_DIR = 'd:/CodeProject/haptic_ResNet/models/weights'
-HYPERPARAMS_DIR = 'd:/CodeProject/haptic_ResNet/models/hyperparams'
-SCALERS_DIR = 'd:/CodeProject/haptic_ResNet/models/scalers'
-DATA_DIR = 'd:/CodeProject/haptic_ResNet/data'
+DATA_ROOT = "/media/xiejiapeng/Work/Backup/Dataset"
+WEIGHTS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/models/weights'
+HYPERPARAMS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/models/hyperparams'
+SCALERS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/models/scalers'
+DATA_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/data'
 MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
-RESULTS_DIR = 'd:/CodeProject/haptic_ResNet/results/test_eval_p_trueResNet18_state_python3.8.10' 
+RESULTS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/results/test_eval_p_trueResNet18_stateMax_linux' 
 
 def load_data(data_root):
     """
@@ -229,7 +239,7 @@ def preprocess_data(all_data, all_labels):
         'padding': 'post'  # 标记使用后填充
     }
     
-    config_path = os.path.join(DATA_DIR, 'preprocessing_config.json')
+    config_path = os.path.join(DATA_DIR, 'state_Max.json')
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(config_path, 'w') as f:
         json.dump(peak_truncation_config, f, indent=2)
@@ -310,8 +320,10 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
     param_grid = {
         # 'lr': [0.1, 0.01, 0.001],
         'lr': [0.001, 0.0001, 0.00001],
-        'batch_size': [16, 32], # 目前笔记本测试时，发现batch=64会显存溢出，直接卡住
-        'max_epochs': [100],
+        'batch_size': [16, 32, 64], # 目前笔记本测试时，发现batch=64会显存溢出，直接卡住
+        # 'lr': [0.001],
+        # 'batch_size': [16], # 目前笔记本测试时，发现batch=64会显存溢出，直接卡住
+        'max_epochs': [200],
     }
 
     # 创建Skorch神经网络分类器
@@ -319,15 +331,17 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
         CustomMultiChannelResNet18,  # 直接传入类,不要实例化
         module__num_channels=X_train.shape[1],  # 使用module__前缀传递模型参数
         module__num_classes=num_classes,
-        max_epochs=100,
+        # max_epochs=100,
         criterion=nn.CrossEntropyLoss,
         optimizer=torch.optim.Adam,
         callbacks=[
             ProgressBar(),  # 添加进度条
+            EpochScoring('accuracy', name='train_acc', lower_is_better=False, on_train=True),
         ],
         device='cuda' if torch.cuda.is_available() else 'cpu',
         iterator_train__shuffle=True,
         iterator_valid__shuffle=False,
+        train_split=ValidSplit(cv=0.2, stratified=True)
     )
 
     # 使用Skorch的GridSearchCV执行超参数搜索
@@ -410,6 +424,7 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
     best_params = grid_search.best_params_.copy()
     
     evaluation_results = {
+        'best_validation_accuracy': float(grid_search.best_score_),
         'test_accuracy': float(test_accuracy),
         'best_params': best_params,  # 只保存网格搜索的最佳参数
         'class_accuracies': class_accuracies,
@@ -422,6 +437,34 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
     )
     
     print(f"\n所有评估结果已保存到: {RESULTS_DIR}")
+
+    history = best_model.history
+    
+    plt.figure(figsize=(12, 5))
+    
+    # 损失曲线
+    plt.subplot(1, 2, 1)
+    plt.plot(history[:, 'train_loss'], label='训练损失')
+    plt.plot(history[:, 'valid_loss'], label='验证损失')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('损失曲线')
+    plt.legend()
+    plt.grid(True)
+    
+    # 准确率曲线
+    plt.subplot(1, 2, 2)
+    plt.plot(history[:, 'train_acc'], label='训练准确率')
+    plt.plot(history[:, 'valid_acc'], label='验证准确率')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('准确率曲线')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(RESULTS_DIR, 'train_history.png'), dpi=300)
+    plt.show()
     
     return best_model, evaluation_results
 
@@ -438,15 +481,15 @@ def save_artifacts(model, terrain_mapping, scalers):
     # 保存PyTorch模型的权重
     os.makedirs(WEIGHTS_DIR, exist_ok=True)
     torch.save(model.module_.state_dict(), 
-               os.path.join(WEIGHTS_DIR, 'p-trueResNet-bmw-100epochs-state-python3.8.0.pth'))
+               os.path.join(WEIGHTS_DIR, 'p-trueResNet-bmw-100epochs-stateMax_linux.pth'))
 
     # 保存Skorch模型的超参数
     os.makedirs(HYPERPARAMS_DIR, exist_ok=True)
     joblib.dump(model, 
-                os.path.join(HYPERPARAMS_DIR, 'p-trueResNet-bmp-100epochs-state-python3.8.0.pkl'))
+                os.path.join(HYPERPARAMS_DIR, 'p-trueResNet-bmp-100epochs-stateMax_linux.pkl'))
 
     joblib.dump(scalers, 
-                os.path.join(SCALERS_DIR, 'p-trueResNet-scalers-100epochs-train-state-python3.8.10.pkl'))
+                os.path.join(SCALERS_DIR, 'p-trueResNet-scalers-100epochs-train-stateMax_linux.pkl'))
     # print(f"Scalers已保存到: {os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')}")
 
 def main():

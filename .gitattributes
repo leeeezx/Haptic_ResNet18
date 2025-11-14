@@ -1,0 +1,29 @@
+# 将所有文本文件在提交时自动转换为LF，在检出时转换为操作系统的默认换行符
+* text=auto eol=lf
+
+# 明确指定某些文件类型总是使用LF（Linux脚本等）
+*.sh    text eol=lf
+*.py    text eol=lf
+*.js    text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.txt   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# 明确指定某些文件类型总是使用CRLF（Windows批处理文件等）
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# 告诉Git以下文件是二进制文件，不要对它们进行任何转换
+*.png   binary
+*.jpg   binary
+*.zip   binary
+*.pth   binary
+*.pt    binary
+*.pkl   binary
+*.joblib binary
+*.npy   binary
+*.npz   binary

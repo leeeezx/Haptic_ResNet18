@@ -1,8 +1,10 @@
 import torch
 import os
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
-from CustomMultiChannelResNet18 import CustomMultiChannelResNet18
+proj_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if proj_root not in sys.path:
+    sys.path.insert(0, proj_root)
+from src.CustomMultiChannelResNet18 import CustomMultiChannelResNet18
 
 def count_parameters(model):
     """

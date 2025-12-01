@@ -401,14 +401,14 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
         save_path=os.path.join(RESULTS_DIR, 'class_accuracies.png')
     )
     
-    # 4. 绘制ROC曲线
-    print("\n生成ROC曲线...")
-    plot_roc_curves(
-        y_test, y_score,
-        unique_labels=unique_labels,
-        class_names=target_names,
-        save_path=os.path.join(RESULTS_DIR, 'roc_curves.png')
-    )
+    # # 4. 绘制ROC曲线
+    # print("\n生成ROC曲线...")
+    # plot_roc_curves(
+    #     y_test, y_score,
+    #     unique_labels=unique_labels,
+    #     class_names=target_names,
+    #     save_path=os.path.join(RESULTS_DIR, 'roc_curves.png')
+    # )
     
     # 5. 可视化预测样本
     print("\n生成预测样本可视化...")

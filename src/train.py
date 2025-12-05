@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import pandas as pd
 import numpy as np
+import random
 from sklearn.model_selection import train_test_split, GridSearchCV
 from skorch.dataset import ValidSplit
 from sklearn.preprocessing import MinMaxScaler
@@ -39,6 +40,20 @@ SCALERS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/models/sc
 DATA_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/data'
 MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
 RESULTS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/results/test_eval_p_trueResNet18_stateMax_linux' 
+
+def set_seed(seed=42):
+    """
+    设置全局随机种子，确保实验可复现
+    """
+    random.seed(seed)              # Python内置随机模块
+    np.random.seed(seed)           # Numpy模块
+    torch.manual_seed(seed)        # CPU上的PyTorch
+    torch.cuda.manual_seed(seed)   # 当前GPU
+    torch.cuda.manual_seed_all(seed) # 所有GPU
+    
+    # 确保卷积操作也是确定的（会牺牲一点点速度，但保证结果一致）
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def load_data(data_root):
     """
@@ -353,12 +368,95 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
     print("Best params:", grid_search.best_params_)
     print("Best validation accuracy:", grid_search.best_score_)
 
-    # 用测试集评估最佳模型
-    best_model = grid_search.best_estimator_
+    # =======================================================
+    # 阶段 1: 获取用于画图的模型 (包含 ValidSplit)
+    # =======================================================
+    # grid_search.best_estimator_ 已经自动完成了 refit (使用 ValidSplit)
+    model_for_plotting = grid_search.best_estimator_
+    
+    # --- 使用 model_for_plotting 画图 (论文需要) ---
+    history = model_for_plotting.history
+
+    # 保存history数据为csv
+    history_data = {
+        'epoch': list(range(1, len(history) + 1)),
+        'train_loss': [h['train_loss'] for h in history],
+        'valid_loss': [h['valid_loss'] for h in history],
+        'train_acc': [h['train_acc'] for h in history],
+        'valid_acc': [h['valid_acc'] for h in history]
+    }
+    history_df = pd.DataFrame(history_data)
+    history_csv_path = os.path.join(RESULTS_DIR, 'training_history.csv')
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    history_df.to_csv(history_csv_path, index=False)
+    print(f"训练历史数据已保存到: {history_csv_path}")
+
+    
+    plt.figure(figsize=(12, 5))
+    # 损失曲线
+    plt.subplot(1, 2, 1)
+    plt.plot(history[:, 'train_loss'], label='训练损失')
+    plt.plot(history[:, 'valid_loss'], label='验证损失')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('损失曲线 (用于验证收敛性)')
+    plt.legend()
+    plt.grid(True)
+    
+    # 准确率曲线
+    plt.subplot(1, 2, 2)
+    plt.plot(history[:, 'train_acc'], label='训练准确率')
+    plt.plot(history[:, 'valid_acc'], label='验证准确率')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('准确率曲线')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(RESULTS_DIR, 'train_history.png'), dpi=300)
+    plt.show()
+    print("训练历史曲线已保存。")
+
+    # =======================================================
+    # 阶段 2: 使用全量数据训练最终模型 (不划分验证集)
+    # =======================================================
+    print("\n开始使用 100% 训练数据 (无验证集划分) 训练最终模型...")
+    
+    best_params = grid_search.best_params_
+    
+    # 创建一个新的网络实例，显式关闭 train_split
+    final_net = NeuralNetClassifier(
+        CustomMultiChannelResNet18,
+        module__num_channels=X_train.shape[1],
+        module__num_classes=num_classes,
+        criterion=nn.CrossEntropyLoss,
+        optimizer=torch.optim.Adam,
+        # 使用搜索到的最佳参数
+        lr=best_params['lr'],
+        batch_size=best_params['batch_size'],
+        max_epochs=best_params['max_epochs'],
+        device='cuda' if torch.cuda.is_available() else 'cpu',
+        iterator_train__shuffle=True,
+        # 关键修改：关闭验证集划分，使用所有数据训练
+        train_split=None, 
+        # 移除依赖验证集的 callback (EpochScoring默认可能需要验证集，这里只保留进度条)
+        callbacks=[ProgressBar()] 
+    )
+    
+    # 使用全部训练数据 fit
+    final_net.fit(Train_data_final_tensor, y=Train_data_final_label_tensor)
+    
+    # 将 best_model 指向这个全量训练的模型
+    best_model = final_net
+
+    # =======================================================
+    # 阶段 3: 评估最终模型
+    # =======================================================
 
     # 在测试集上评估模型
     test_accuracy = best_model.score(Test_data_final_tensor, Test_data_final_label_tensor)
-    print(f"测试集准确率: {test_accuracy:.4f}")
+    print(f"最终模型(全量训练) 测试集准确率: {test_accuracy:.4f}")
     
     # 获取预测结果
     y_pred = best_model.predict(Test_data_final_tensor)
@@ -437,34 +535,6 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
     )
     
     print(f"\n所有评估结果已保存到: {RESULTS_DIR}")
-
-    history = best_model.history
-    
-    plt.figure(figsize=(12, 5))
-    
-    # 损失曲线
-    plt.subplot(1, 2, 1)
-    plt.plot(history[:, 'train_loss'], label='训练损失')
-    plt.plot(history[:, 'valid_loss'], label='验证损失')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('损失曲线')
-    plt.legend()
-    plt.grid(True)
-    
-    # 准确率曲线
-    plt.subplot(1, 2, 2)
-    plt.plot(history[:, 'train_acc'], label='训练准确率')
-    plt.plot(history[:, 'valid_acc'], label='验证准确率')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title('准确率曲线')
-    plt.legend()
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(RESULTS_DIR, 'train_history.png'), dpi=300)
-    plt.show()
     
     return best_model, evaluation_results
 
@@ -496,6 +566,8 @@ def main():
     """
     主函数，按顺序执行数据加载、预处理、训练和保存。
     """
+    set_seed(42)  # 设置随机种子，确保可复现性
+
     all_data, all_labels, terrain_to_index, index_to_terrain, num_classes = load_data(DATA_ROOT)
     X_train, X_test, y_train, y_test, scalers = preprocess_data(all_data, all_labels)
 

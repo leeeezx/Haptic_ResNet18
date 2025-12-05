@@ -298,6 +298,16 @@ def preprocess_data(all_data, all_labels):
         X_test[:, i, :] = scaler.transform(test_channel_data.reshape(-1, 1)).reshape(test_channel_data.shape)
         scalers.append(scaler)
     print("归一化完成")
+
+    processed_data_path = os.path.join(DATA_DIR, 'processed_data.npz')
+    np.savez(
+        processed_data_path,
+        X_train=X_train,
+        X_test=X_test,
+        y_train=y_train,
+        y_test=y_test
+    )
+    print(f"预处理后的数据已保存到: {processed_data_path}")
     
     return X_train, X_test, y_train, y_test, scalers
 

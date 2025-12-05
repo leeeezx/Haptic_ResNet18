@@ -32,14 +32,22 @@ from evaluation_visualizer import (
     save_evaluation_results
 )
 
-# 全局配置
+# ==========================================
+# 全局配置与实验标识 
+# ==========================================
+EXPERIMENT_TAG = "p_trueResNet18_stateMax_linux_100epochs" # 实验标签，用于区分不同实验设置！！！
+# 提示，仍然需要手动确定修改的地方：peak_truncation_config（预处理配置）、
+
 DATA_ROOT = "/media/xiejiapeng/Work/Backup/Dataset"
-WEIGHTS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/models/weights'
-HYPERPARAMS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/models/hyperparams'
-SCALERS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/models/scalers'
-DATA_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/data'
+PROJECT_ROOT = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet'
+
+WEIGHTS_DIR = os.path.join(PROJECT_ROOT, 'models/weights')
+HYPERPARAMS_DIR = os.path.join(PROJECT_ROOT, 'models/hyperparams')
+SCALERS_DIR = os.path.join(PROJECT_ROOT, 'models/scalers')
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+RESULTS_DIR = os.path.join(PROJECT_ROOT, f'results/test_eval_{EXPERIMENT_TAG}') 
+
 MAPPING_FILE = os.path.join(DATA_DIR, 'terrain_mapping.json')
-RESULTS_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/results/test_eval_p_trueResNet18_stateMax_linux' 
 
 def set_seed(seed=42):
     """
@@ -254,7 +262,7 @@ def preprocess_data(all_data, all_labels):
         'padding': 'post'  # 标记使用后填充
     }
     
-    config_path = os.path.join(DATA_DIR, 'state_Max.json')
+    config_path = os.path.join(DATA_DIR, f'state_Max_{EXPERIMENT_TAG}.json')
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(config_path, 'w') as f:
         json.dump(peak_truncation_config, f, indent=2)
@@ -299,7 +307,7 @@ def preprocess_data(all_data, all_labels):
         scalers.append(scaler)
     print("归一化完成")
 
-    processed_data_path = os.path.join(DATA_DIR, 'processed_data.npz')
+    processed_data_path = os.path.join(DATA_DIR, f'processed_data_{EXPERIMENT_TAG}.npz')
     np.savez(
         processed_data_path,
         X_train=X_train,
@@ -564,19 +572,26 @@ def save_artifacts(model, terrain_mapping, scalers):
     with open(MAPPING_FILE, 'w') as f:
         json.dump(terrain_mapping, f, indent=2)
 
+    # 构造带后缀的文件名
+    weights_name = f'{EXPERIMENT_TAG}.pth'
+    hyperparams_name = f'{EXPERIMENT_TAG}.pkl'
+    scalers_name = f'{EXPERIMENT_TAG}.pkl'
+
     # 保存PyTorch模型的权重
     os.makedirs(WEIGHTS_DIR, exist_ok=True)
     torch.save(model.module_.state_dict(), 
-               os.path.join(WEIGHTS_DIR, 'p-trueResNet-bmw-100epochs-stateMax_linux.pth'))
+               os.path.join(WEIGHTS_DIR, weights_name))
+    print(f"权重已保存: {weights_name}")
 
     # 保存Skorch模型的超参数
     os.makedirs(HYPERPARAMS_DIR, exist_ok=True)
     joblib.dump(model, 
-                os.path.join(HYPERPARAMS_DIR, 'p-trueResNet-bmp-100epochs-stateMax_linux.pkl'))
+                os.path.join(HYPERPARAMS_DIR, hyperparams_name))
+    print(f"模型参数已保存: {hyperparams_name}")
 
     joblib.dump(scalers, 
-                os.path.join(SCALERS_DIR, 'p-trueResNet-scalers-100epochs-train-stateMax_linux.pkl'))
-    # print(f"Scalers已保存到: {os.path.join(SCALERS_DIR, 'scalers-100epochs.pkl')}")
+                os.path.join(SCALERS_DIR, scalers_name))
+    print(f"Scalers已保存: {scalers_name}")
 
 def main():
     """

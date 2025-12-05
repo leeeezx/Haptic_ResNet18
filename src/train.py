@@ -288,8 +288,14 @@ def preprocess_data(all_data, all_labels):
     scalers = []  
     for i in range(X_train.shape[1]):
         scaler = MinMaxScaler()
-        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :])
-        X_test[:, i, :] = scaler.transform(X_test[:, i, :])
+        # 提取该通道所有数据：（样本数，序列长度）
+        train_channel_data = X_train[:, i, :]
+        test_channel_data = X_test[:, i, :]
+        # 展平为 (样本数 * 序列长度, 1) ，计算全局min和max
+        scaler.fit(train_channel_data.reshape(-1, 1))
+        # 变换回原始形状
+        X_train[:, i, :] = scaler.transform(train_channel_data.reshape(-1, 1)).reshape(train_channel_data.shape)
+        X_test[:, i, :] = scaler.transform(test_channel_data.reshape(-1, 1)).reshape(test_channel_data.shape)
         scalers.append(scaler)
     print("归一化完成")
     

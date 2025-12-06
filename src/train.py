@@ -35,11 +35,11 @@ from evaluation_visualizer import (
 # ==========================================
 # 全局配置与实验标识 
 # ==========================================
-EXPERIMENT_TAG = "p_trueResNet18_stateMax_linux_100epochs" # 实验标签，用于区分不同实验设置！！！
+EXPERIMENT_TAG = "p_trueResNet18_stateMax_noFullScaleTrain_linux_200epochs" # 实验标签，用于区分不同实验设置！！！
 # 提示，仍然需要手动确定修改的地方：peak_truncation_config（预处理配置）、
 
-DATA_ROOT = "/media/xiejiapeng/Work/Backup/Dataset"
-PROJECT_ROOT = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet'
+DATA_ROOT = "/media/xiejiapeng/Work/Dataset"
+PROJECT_ROOT = '/media/xiejiapeng/Work/haptic_ResNet'
 
 WEIGHTS_DIR = os.path.join(PROJECT_ROOT, 'models/weights')
 HYPERPARAMS_DIR = os.path.join(PROJECT_ROOT, 'models/hyperparams')
@@ -296,14 +296,16 @@ def preprocess_data(all_data, all_labels):
     scalers = []  
     for i in range(X_train.shape[1]):
         scaler = MinMaxScaler()
-        # 提取该通道所有数据：（样本数，序列长度）
-        train_channel_data = X_train[:, i, :]
-        test_channel_data = X_test[:, i, :]
-        # 展平为 (样本数 * 序列长度, 1) ，计算全局min和max
-        scaler.fit(train_channel_data.reshape(-1, 1))
-        # 变换回原始形状
-        X_train[:, i, :] = scaler.transform(train_channel_data.reshape(-1, 1)).reshape(train_channel_data.shape)
-        X_test[:, i, :] = scaler.transform(test_channel_data.reshape(-1, 1)).reshape(test_channel_data.shape)
+        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :])
+        X_test[:, i, :] = scaler.transform(X_test[:, i, :])
+        # # 提取该通道所有数据：（样本数，序列长度）
+        # train_channel_data = X_train[:, i, :]
+        # test_channel_data = X_test[:, i, :]
+        # # 展平为 (样本数 * 序列长度, 1) ，计算全局min和max
+        # scaler.fit(train_channel_data.reshape(-1, 1))
+        # # 变换回原始形状
+        # X_train[:, i, :] = scaler.transform(train_channel_data.reshape(-1, 1)).reshape(train_channel_data.shape)
+        # X_test[:, i, :] = scaler.transform(test_channel_data.reshape(-1, 1)).reshape(test_channel_data.shape)
         scalers.append(scaler)
     print("归一化完成")
 
@@ -380,7 +382,8 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
         device='cuda' if torch.cuda.is_available() else 'cpu',
         iterator_train__shuffle=True,
         iterator_valid__shuffle=False,
-        train_split=ValidSplit(cv=0.2, stratified=True)
+        train_split=ValidSplit(cv=0.2, stratified=True),
+        # train_split=None
     )
 
     # 使用Skorch的GridSearchCV执行超参数搜索
@@ -445,38 +448,39 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, num_classes, terrain_ma
     # =======================================================
     # 阶段 2: 使用全量数据训练最终模型 (不划分验证集)
     # =======================================================
-    print("\n开始使用 100% 训练数据 (无验证集划分) 训练最终模型...")
+    # print("\n开始使用 100% 训练数据 (无验证集划分) 训练最终模型...")
     
-    best_params = grid_search.best_params_
+    # best_params = grid_search.best_params_
     
-    # 创建一个新的网络实例，显式关闭 train_split
-    final_net = NeuralNetClassifier(
-        CustomMultiChannelResNet18,
-        module__num_channels=X_train.shape[1],
-        module__num_classes=num_classes,
-        criterion=nn.CrossEntropyLoss,
-        optimizer=torch.optim.Adam,
-        # 使用搜索到的最佳参数
-        lr=best_params['lr'],
-        batch_size=best_params['batch_size'],
-        max_epochs=best_params['max_epochs'],
-        device='cuda' if torch.cuda.is_available() else 'cpu',
-        iterator_train__shuffle=True,
-        # 关键修改：关闭验证集划分，使用所有数据训练
-        train_split=None, 
-        # 移除依赖验证集的 callback (EpochScoring默认可能需要验证集，这里只保留进度条)
-        callbacks=[ProgressBar()] 
-    )
+    # # 创建一个新的网络实例，显式关闭 train_split
+    # final_net = NeuralNetClassifier(
+    #     CustomMultiChannelResNet18,
+    #     module__num_channels=X_train.shape[1],
+    #     module__num_classes=num_classes,
+    #     criterion=nn.CrossEntropyLoss,
+    #     optimizer=torch.optim.Adam,
+    #     # 使用搜索到的最佳参数
+    #     lr=best_params['lr'],
+    #     batch_size=best_params['batch_size'],
+    #     max_epochs=best_params['max_epochs'],
+    #     device='cuda' if torch.cuda.is_available() else 'cpu',
+    #     iterator_train__shuffle=True,
+    #     # 关键修改：关闭验证集划分，使用所有数据训练
+    #     train_split=None, 
+    #     # 移除依赖验证集的 callback (EpochScoring默认可能需要验证集，这里只保留进度条)
+    #     callbacks=[ProgressBar()] 
+    # )
     
-    # 使用全部训练数据 fit
-    final_net.fit(Train_data_final_tensor, y=Train_data_final_label_tensor)
+    # # 使用全部训练数据 fit
+    # final_net.fit(Train_data_final_tensor, y=Train_data_final_label_tensor)
     
-    # 将 best_model 指向这个全量训练的模型
-    best_model = final_net
+    # # 将 best_model 指向这个全量训练的模型
+    # best_model = final_net
 
     # =======================================================
     # 阶段 3: 评估最终模型
     # =======================================================
+    best_model = grid_search.best_estimator_
 
     # 在测试集上评估模型
     test_accuracy = best_model.score(Test_data_final_tensor, Test_data_final_label_tensor)

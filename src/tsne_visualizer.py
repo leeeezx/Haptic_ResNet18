@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 import torch
 import torch.nn as nn
+import pandas as pd  # 新增导入
 
 plt.rcParams['font.sans-serif'] = [    
     'Noto Sans CJK SC',
@@ -66,7 +67,7 @@ def extract_features(model, data_tensor, device='cuda'):
 
 
 def plot_tsne(features, labels, index_to_terrain, save_path, 
-              perplexity=30, n_iter=1000, random_state=42):
+              perplexity=30, n_iter=1000, random_state=42, save_csv=False):
     """
     绘制 T-SNE 二维特征可视化图。
     
@@ -75,6 +76,105 @@ def plot_tsne(features, labels, index_to_terrain, save_path,
         labels (np.ndarray): 标签数组
         index_to_terrain (dict): 索引到地形名称的映射
         save_path (str): 图片保存路径
+        perplexity (int): T-SNE 困惑度参数
+        n_iter (int): 迭代次数
+        random_state (int): 随机种子
+        save_csv (bool): 是否保存二维散点数据为 CSV 文件
+        
+    Returns:
+        np.ndarray: T-SNE 降维后的二维坐标
+    """
+    print(f"正在进行 T-SNE 降维... (perplexity={perplexity}, n_iter={n_iter})")
+    
+    tsne = TSNE(
+        n_components=2,
+        perplexity=perplexity,
+        n_iter=n_iter,
+        random_state=random_state,
+        init='pca',
+        learning_rate='auto'
+    )
+    
+    features_2d = tsne.fit_transform(features)
+    
+    # 保存 CSV 文件
+    if save_csv:
+        csv_path = save_path.replace('.png', '.csv').replace('.jpg', '.csv')
+        df = pd.DataFrame({
+            'x': features_2d[:, 0],
+            'y': features_2d[:, 1],
+            'label': labels,
+            'terrain': [index_to_terrain[label] for label in labels]
+        })
+        df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+        print(f"T-SNE 数据已保存到: {csv_path}")
+    
+    print("T-SNE 降维完成，开始绘图...")
+    
+    # 获取唯一标签并排序
+    unique_labels = sorted(list(set(labels.tolist())))
+    n_classes = len(unique_labels)
+    
+    # 创建颜色映射
+    cmap = plt.cm.get_cmap('tab20' if n_classes > 10 else 'tab10')
+    colors = [cmap(i / n_classes) for i in range(n_classes)]
+    
+    # 设置图片尺寸：宽度13厘米，保持宽高比（原12:10）
+    width_cm = 13
+    height_cm = width_cm * 10 / 12  # 保持原有比例
+    width_inch = width_cm / 2.54  # 厘米转英寸
+    height_inch = height_cm / 2.54
+    
+    # 绘制散点图
+    plt.figure(figsize=(width_inch, height_inch))
+    
+    for idx, label in enumerate(unique_labels):
+        mask = labels == label
+        terrain_name = index_to_terrain[label]
+        plt.scatter(
+            features_2d[mask, 0],
+            features_2d[mask, 1],
+            c=[colors[idx]],
+            label=terrain_name,
+            alpha=0.7,
+            s=80,  # 增大点大小
+            edgecolors='white',
+            linewidth=0.5
+        )
+    
+    # 设置坐标轴标题和刻度标签的字体大小
+    plt.xlabel('T-SNE 维度 1', fontsize=10)
+    plt.ylabel('T-SNE 维度 2', fontsize=10)
+    plt.title('T-SNE 特征可视化', fontsize=12)
+    plt.legend(
+        loc='center left',
+        bbox_to_anchor=(1.02, 0.5),
+        fontsize=8,
+        title='地形类别',
+        title_fontsize=9
+    )
+    plt.xticks(fontsize=10)  # 设置刻度标签字号为10
+    plt.yticks(fontsize=10)  # 设置刻度标签字号为10
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print(f"T-SNE 图已保存到: {save_path}")
+    
+    return features_2d
+
+
+def export_tsne_data(features, labels, index_to_terrain, csv_path,
+                     perplexity=30, n_iter=1000, random_state=42):
+    """
+    仅导出 T-SNE 降维数据为 CSV 文件（不绘图）。
+    
+    Args:
+        features (np.ndarray): 特征向量，形状为 (n_samples, n_features)
+        labels (np.ndarray): 标签数组
+        index_to_terrain (dict): 索引到地形名称的映射
+        csv_path (str): CSV 文件保存路径
         perplexity (int): T-SNE 困惑度参数
         n_iter (int): 迭代次数
         random_state (int): 随机种子
@@ -95,57 +195,27 @@ def plot_tsne(features, labels, index_to_terrain, save_path,
     
     features_2d = tsne.fit_transform(features)
     
-    print("T-SNE 降维完成，开始绘图...")
+    # 创建 DataFrame
+    df = pd.DataFrame({
+        'x': features_2d[:, 0],
+        'y': features_2d[:, 1],
+        'label': labels,
+        'terrain': [index_to_terrain[label] for label in labels]
+    })
     
-    # 获取唯一标签并排序
-    unique_labels = sorted(list(set(labels.tolist())))
-    n_classes = len(unique_labels)
-    
-    # 创建颜色映射
-    cmap = plt.cm.get_cmap('tab20' if n_classes > 10 else 'tab10')
-    colors = [cmap(i / n_classes) for i in range(n_classes)]
-    
-    # 绘制散点图
-    plt.figure(figsize=(12, 10))
-    
-    for idx, label in enumerate(unique_labels):
-        mask = labels == label
-        terrain_name = index_to_terrain[label]
-        plt.scatter(
-            features_2d[mask, 0],
-            features_2d[mask, 1],
-            c=[colors[idx]],
-            label=terrain_name,
-            alpha=0.7,
-            s=50,
-            edgecolors='white',
-            linewidth=0.5
-        )
-    
-    plt.xlabel('T-SNE 维度 1', fontsize=14)
-    plt.ylabel('T-SNE 维度 2', fontsize=14)
-    plt.title('T-SNE 特征可视化', fontsize=16)
-    plt.legend(
-        loc='center left',
-        bbox_to_anchor=(1.02, 0.5),
-        fontsize=10,
-        title='地形类别',
-        title_fontsize=12
-    )
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.grid(alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    print(f"T-SNE 图已保存到: {save_path}")
+    # 保存为 CSV
+    df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+    print(f"T-SNE 数据已保存到: {csv_path}")
+    print(f"数据维度: {features_2d.shape}")
+    print(f"样本数量: {len(df)}")
+    print(f"标签数量: {len(index_to_terrain)}")
     
     return features_2d
 
 
 def plot_tsne_with_decision_boundary(features, labels, index_to_terrain, save_path,
-                                      perplexity=30, n_iter=1000, random_state=42):
+                                     perplexity=30, n_iter=1000, random_state=42,
+                                     save_csv=False):
     """
     绘制带有决策边界背景的 T-SNE 图（可选高级版本）。
     
@@ -157,6 +227,7 @@ def plot_tsne_with_decision_boundary(features, labels, index_to_terrain, save_pa
         perplexity (int): T-SNE 困惑度参数
         n_iter (int): 迭代次数
         random_state (int): 随机种子
+        save_csv (bool): 是否保存二维散点数据为 CSV 文件
     """
     from sklearn.neighbors import KNeighborsClassifier
     
@@ -170,6 +241,18 @@ def plot_tsne_with_decision_boundary(features, labels, index_to_terrain, save_pa
         learning_rate='auto'
     )
     features_2d = tsne.fit_transform(features)
+    
+    # 保存 CSV 文件
+    if save_csv:
+        csv_path = save_path.replace('.png', '.csv').replace('.jpg', '.csv')
+        df = pd.DataFrame({
+            'x': features_2d[:, 0],
+            'y': features_2d[:, 1],
+            'label': labels,
+            'terrain': [index_to_terrain[label] for label in labels]
+        })
+        df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+        print(f"T-SNE 数据已保存到: {csv_path}")
     
     # 训练一个简单的 KNN 分类器用于绘制决策边界
     knn = KNeighborsClassifier(n_neighbors=5)
@@ -191,8 +274,14 @@ def plot_tsne_with_decision_boundary(features, labels, index_to_terrain, save_pa
     cmap = plt.cm.get_cmap('tab20' if n_classes > 10 else 'tab10')
     colors = [cmap(i / n_classes) for i in range(n_classes)]
     
+    # 设置图片尺寸：宽度13厘米，保持宽高比（原14:10）
+    width_cm = 13
+    height_cm = width_cm * 10 / 14  # 保持原有比例
+    width_inch = width_cm / 2.54  # 厘米转英寸
+    height_inch = height_cm / 2.54
+    
     # 绘图
-    plt.figure(figsize=(14, 10))
+    plt.figure(figsize=(width_inch, height_inch))
     
     # 绘制决策边界背景
     plt.contourf(xx, yy, Z, alpha=0.2, cmap='tab10')
@@ -207,20 +296,28 @@ def plot_tsne_with_decision_boundary(features, labels, index_to_terrain, save_pa
             c=[colors[idx]],
             label=terrain_name,
             alpha=0.8,
-            s=60,
+            s=80,  # 增大点大小
             edgecolors='black',
             linewidth=0.5
         )
     
-    plt.xlabel('T-SNE 维度 1', fontsize=14)
-    plt.ylabel('T-SNE 维度 2', fontsize=14)
-    plt.title('T-SNE 特征可视化（带决策边界）', fontsize=16)
+    # 设置坐标轴标题和刻度标签的字体大小
+    plt.xlabel('T-SNE 维度 1', fontsize=10)
+    plt.ylabel('T-SNE 维度 2', fontsize=10)
+    plt.title('T-SNE 特征可视化（带决策边界）', fontsize=12)
     plt.legend(
         loc='center left',
         bbox_to_anchor=(1.02, 0.5),
-        fontsize=10,
-        title='地形类别'
+        fontsize=8,
+        title='地形类别',
+        title_fontsize=9
     )
+    plt.xticks(fontsize=10)  # 设置刻度标签字号为10
+    plt.yticks(fontsize=10)  # 设置刻度标签字号为10
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.show()
+    
+    print(f"T-SNE 图已保存到: {save_path}")
+    
+    return features_2d

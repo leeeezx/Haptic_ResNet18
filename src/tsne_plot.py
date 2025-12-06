@@ -28,10 +28,10 @@ def load_processed_data(data_path):
 
 def main():
     # 配置路径
-    MODEL_PATH = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/models/hyperparams/p-trueResNet-bmp-100epochs-stateMax_linux.pkl'
+    MODEL_PATH = '/media/xiejiapeng/Work/haptic_ResNet/models/hyperparams/p_trueResNet18_stateMax_noFullScaleTrain_linux_200epochs.pkl'
     MAPPING_PATH = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/data/terrain_mapping.json'
-    DATA_PATH = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/data/processed_data.npz'
-    OUTPUT_DIR = '/media/xiejiapeng/Work/Backup/CodeProject/haptic_ResNet/results/tsne'
+    DATA_PATH = '/media/xiejiapeng/Work/haptic_ResNet/data/processed_data_p_trueResNet18_stateMax_noFullScaleTrain_linux_200epochs.npz'
+    OUTPUT_DIR = '/media/xiejiapeng/Work/haptic_ResNet/results/tsne'
     
     # 加载模型
     print("加载模型...")
@@ -68,16 +68,17 @@ def main():
         index_to_terrain, 
         os.path.join(OUTPUT_DIR, 'tsne_test.png'),
         perplexity=30,
-        n_iter=1000
+        n_iter=1000,
+        save_csv=True 
     )
     
     # 可选：绘制带决策边界的 T-SNE 图
-    # plot_tsne_with_decision_boundary(
-    #     features, 
-    #     y_test, 
-    #     index_to_terrain, 
-    #     os.path.join(OUTPUT_DIR, 'tsne_with_boundary.png')
-    # )
+    plot_tsne_with_decision_boundary(
+        features, 
+        y_test, 
+        index_to_terrain, 
+        os.path.join(OUTPUT_DIR, 'tsne_with_boundary.png')
+    )
     
     print("\nT-SNE 可视化完成！")
 

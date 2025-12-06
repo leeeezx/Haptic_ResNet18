@@ -293,20 +293,36 @@ def preprocess_data(all_data, all_labels):
     # 5. 数据归一化 (Min-Max Scaling)
     # ==========================================
     print("开始归一化处理...")
+
+    def per_sample_normalize(X_data, epsilon=1e-8):
+        """
+        对每个样本的每个通道独立进行 Min-Max 归一化到 [0, 1]
+        X 的形状: (样本数, 通道数, 序列长度)
+        """
+        min_vals = X_data.min(axis=2, keepdims=True)
+        max_vals = X_data.max(axis=2, keepdims=True)
+        X_normalized = (X_data - min_vals) / (max_vals - min_vals + epsilon)
+        return X_normalized
+    
+    X_train = per_sample_normalize(X_train)
+    X_test = per_sample_normalize(X_test)
+
     scalers = []  
-    for i in range(X_train.shape[1]):
-        scaler = MinMaxScaler()
-        X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :])
-        X_test[:, i, :] = scaler.transform(X_test[:, i, :])
-        # # 提取该通道所有数据：（样本数，序列长度）
-        # train_channel_data = X_train[:, i, :]
-        # test_channel_data = X_test[:, i, :]
-        # # 展平为 (样本数 * 序列长度, 1) ，计算全局min和max
-        # scaler.fit(train_channel_data.reshape(-1, 1))
-        # # 变换回原始形状
-        # X_train[:, i, :] = scaler.transform(train_channel_data.reshape(-1, 1)).reshape(train_channel_data.shape)
-        # X_test[:, i, :] = scaler.transform(test_channel_data.reshape(-1, 1)).reshape(test_channel_data.shape)
-        scalers.append(scaler)
+    # for i in range(X_train.shape[1]):
+    #     scaler = MinMaxScaler()
+    #     X_train[:, i, :] = scaler.fit_transform(X_train[:, i, :])
+    #     X_test[:, i, :] = scaler.transform(X_test[:, i, :])
+
+    #     # # 提取该通道所有数据：（样本数，序列长度）
+    #     # train_channel_data = X_train[:, i, :]
+    #     # test_channel_data = X_test[:, i, :]
+    #     # # 展平为 (样本数 * 序列长度, 1) ，计算全局min和max
+    #     # scaler.fit(train_channel_data.reshape(-1, 1))
+    #     # # 变换回原始形状
+    #     # X_train[:, i, :] = scaler.transform(train_channel_data.reshape(-1, 1)).reshape(train_channel_data.shape)
+    #     # X_test[:, i, :] = scaler.transform(test_channel_data.reshape(-1, 1)).reshape(test_channel_data.shape)
+
+    #     scalers.append(scaler)
     print("归一化完成")
 
     processed_data_path = os.path.join(DATA_DIR, f'processed_data_{EXPERIMENT_TAG}.npz')

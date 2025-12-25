@@ -14,6 +14,7 @@
 **stateMax**：
 
 **allscaler**：单一通道全局归一化
+**InsNor**：单一样本单一通道归一化
 **noVal**：显示取消验证集（train_split=None）
 
 **noFullScalerTrain**：不进行最终全量训练

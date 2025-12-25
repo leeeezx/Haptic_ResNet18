@@ -35,7 +35,7 @@ from evaluation_visualizer import (
 # ==========================================
 # 全局配置与实验标识 
 # ==========================================
-EXPERIMENT_TAG = "p_trueResNet18_stateMax_noFullScaleTrain_linux_200epochs" # 实验标签，用于区分不同实验设置！！！
+EXPERIMENT_TAG = "p_trueResNet18_stateMax_InsNor_noFullScaleTrain_linux_200epochs" # 实验标签，用于区分不同实验设置！！！
 # 提示，仍然需要手动确定修改的地方：peak_truncation_config（预处理配置）、
 
 DATA_ROOT = "/media/xiejiapeng/Work/Dataset"
